@@ -101,6 +101,55 @@ function getLocation() {
 }
 function fileOf(id) { return $(`#${id}`)?.files?.[0] || null; }
 
+// Helper kamera selfie langsung: buka kamera depan, ambil JPEG dari canvas, lalu jadikan File.
+async function startCamera(videoElement) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Browser tidak mendukung kamera langsung. Gunakan Chrome terbaru di HP.");
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: { ideal: 960 },
+        height: { ideal: 1280 }
+      },
+      audio: false
+    });
+    videoElement.srcObject = stream;
+    await videoElement.play();
+    return stream;
+  } catch {
+    throw new Error("Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan aplikasi dibuka melalui HTTPS.");
+  }
+}
+
+function stopCamera(stream) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+async function capturePhoto(videoElement, canvasElement) {
+  if (!videoElement.videoWidth || !videoElement.videoHeight) {
+    throw new Error("Kamera belum siap. Tunggu preview tampil lalu coba lagi.");
+  }
+  const maxWidth = 960;
+  const scale = Math.min(1, maxWidth / videoElement.videoWidth);
+  canvasElement.width = Math.round(videoElement.videoWidth * scale);
+  canvasElement.height = Math.round(videoElement.videoHeight * scale);
+  const context = canvasElement.getContext("2d");
+  context.save();
+  context.translate(canvasElement.width, 0);
+  context.scale(-1, 1);
+  context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+  context.restore();
+  const blob = await new Promise((resolve) => canvasElement.toBlob(resolve, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Foto selfie gagal diproses.");
+  return blob;
+}
+
+function blobToFile(blob, fileName) {
+  return new File([blob], fileName, { type: blob.type || "image/jpeg", lastModified: Date.now() });
+}
+
 function initHome() { preserveDemoNavigation(); }
 
 function initEmployeeLogin() {
@@ -132,10 +181,134 @@ async function initEmployeeDashboard() {
   if (!session?.employee?.id || !session?.pin) return location.replace(withDemo("login.html"));
   let employee = session.employee;
   let todayAttendance = null;
+  // State selfie masuk/pulang dipisah supaya validasi absen tidak lagi memakai input file.
+  let checkInCameraStream = null;
+  let checkOutCameraStream = null;
+  let capturedCheckInBlob = null;
+  let capturedCheckOutBlob = null;
+  let checkInPreviewUrl = "";
+  let checkOutPreviewUrl = "";
+
+  const checkInCamera = {
+    label: "masuk",
+    video: $("#checkInVideo"),
+    canvas: $("#checkInCanvas"),
+    preview: $("#checkInPreview"),
+    placeholder: $("#checkInCameraPlaceholder"),
+    openButton: $("#openCheckInCamera"),
+    captureButton: $("#captureCheckInPhoto"),
+    retakeButton: $("#retakeCheckInPhoto"),
+    get stream() { return checkInCameraStream; },
+    set stream(value) { checkInCameraStream = value; },
+    get blob() { return capturedCheckInBlob; },
+    set blob(value) { capturedCheckInBlob = value; },
+    get previewUrl() { return checkInPreviewUrl; },
+    set previewUrl(value) { checkInPreviewUrl = value; }
+  };
+  const checkOutCamera = {
+    label: "pulang",
+    video: $("#checkOutVideo"),
+    canvas: $("#checkOutCanvas"),
+    preview: $("#checkOutPreview"),
+    placeholder: $("#checkOutCameraPlaceholder"),
+    openButton: $("#openCheckOutCamera"),
+    captureButton: $("#captureCheckOutPhoto"),
+    retakeButton: $("#retakeCheckOutPhoto"),
+    get stream() { return checkOutCameraStream; },
+    set stream(value) { checkOutCameraStream = value; },
+    get blob() { return capturedCheckOutBlob; },
+    set blob(value) { capturedCheckOutBlob = value; },
+    get previewUrl() { return checkOutPreviewUrl; },
+    set previewUrl(value) { checkOutPreviewUrl = value; }
+  };
+
+  function isCameraBlocked(controller) {
+    if (controller.label === "masuk") return Boolean(todayAttendance?.check_in_time);
+    return !todayAttendance?.check_in_time || Boolean(todayAttendance?.check_out_time);
+  }
+
+  function cameraBlockedMessage(controller) {
+    if (controller.label === "pulang" && !todayAttendance?.check_in_time) return "Lakukan absen masuk terlebih dahulu.";
+    return "Absensi hari ini sudah tercatat.";
+  }
+
+  function clearCapturedPhoto(controller) {
+    if (controller.previewUrl) URL.revokeObjectURL(controller.previewUrl);
+    controller.previewUrl = "";
+    controller.blob = null;
+    controller.preview.removeAttribute("src");
+  }
+
+  function stopCameraController(controller) {
+    stopCamera(controller.stream);
+    controller.stream = null;
+    controller.video.pause();
+    controller.video.srcObject = null;
+  }
+
+  function renderCamera(controller) {
+    const hasStream = Boolean(controller.stream);
+    const hasBlob = Boolean(controller.blob);
+    const blocked = isCameraBlocked(controller);
+    controller.placeholder.classList.toggle("hidden", hasStream || hasBlob);
+    controller.video.classList.toggle("hidden", !hasStream);
+    controller.preview.classList.toggle("hidden", !hasBlob);
+    controller.openButton.disabled = blocked || hasStream || hasBlob;
+    controller.captureButton.disabled = blocked || !hasStream;
+    controller.retakeButton.classList.toggle("hidden", !hasBlob);
+    controller.retakeButton.disabled = blocked;
+  }
+
+  function resetCamera(controller) {
+    stopCameraController(controller);
+    clearCapturedPhoto(controller);
+    renderCamera(controller);
+  }
+
+  async function openCamera(controller) {
+    if (isCameraBlocked(controller)) return showToast("Kamera belum tersedia", cameraBlockedMessage(controller), "error");
+    clearCapturedPhoto(controller);
+    stopCameraController(controller);
+    renderCamera(controller);
+    setLoading(controller.openButton, true, "Membuka kamera...");
+    try {
+      controller.stream = await startCamera(controller.video);
+      renderCamera(controller);
+    } catch (error) {
+      showToast("Kamera gagal dibuka", errorMessage(error), "error");
+      stopCameraController(controller);
+    } finally {
+      setLoading(controller.openButton, false);
+      renderCamera(controller);
+    }
+  }
+
+  async function captureCamera(controller) {
+    if (!controller.stream) return showToast("Kamera belum dibuka", `Buka kamera ${controller.label} terlebih dahulu.`, "error");
+    setLoading(controller.captureButton, true, "Mengambil foto...");
+    try {
+      const blob = await capturePhoto(controller.video, controller.canvas);
+      stopCameraController(controller);
+      controller.blob = blob;
+      controller.previewUrl = URL.createObjectURL(blob);
+      controller.preview.src = controller.previewUrl;
+      showToast("Foto selfie siap", `Selfie ${controller.label} sudah diambil.`);
+    } catch (error) {
+      showToast("Foto gagal diambil", errorMessage(error), "error");
+    } finally {
+      setLoading(controller.captureButton, false);
+      renderCamera(controller);
+    }
+  }
+
+  function stopAllCameras() {
+    stopCameraController(checkInCamera);
+    stopCameraController(checkOutCamera);
+  }
 
   function renderProfile() {
     $("#welcomeName").textContent = `Halo, ${employee.name}`;
-    $("#employeeMeta").textContent = `${employee.bagian} • Shift ${employee.shift || "-"}`;
+    $("#employeeMeta").textContent = `${employee.bagian} - Shift ${employee.shift || "-"}`;
     $("#employeeBio").value = employee.bio || "";
     $("#profilePhoto").src = employee.photo_url || `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="24" fill="#e8f4fb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="38" fill="#1479b8">${employee.name.slice(0,1).toUpperCase()}</text></svg>`)}`;
   }
@@ -147,6 +320,8 @@ async function initEmployeeDashboard() {
     $("#checkOutValue").textContent = todayAttendance?.check_out_time ? `${formatTime(todayAttendance.check_out_time)} WITA - ${todayAttendance.work_duration || ""}` : "Belum tercatat";
     $("#checkInButton").disabled = Boolean(todayAttendance?.check_in_time);
     $("#checkOutButton").disabled = !todayAttendance?.check_in_time || Boolean(todayAttendance?.check_out_time);
+    renderCamera(checkInCamera);
+    renderCamera(checkOutCamera);
   }
   async function loadToday() {
     todayAttendance = await api.getDailyAttendance(employee.id, session.pin, localDateKey());
@@ -200,20 +375,28 @@ async function initEmployeeDashboard() {
   $("#requestEnd").value = localDateKey();
 
   $("#employeeLogout").addEventListener("click", () => {
+    stopAllCameras();
     sessionStorage.removeItem(EMPLOYEE_SESSION_KEY);
     location.assign(withDemo("login.html"));
   });
+  checkInCamera.openButton.addEventListener("click", () => openCamera(checkInCamera));
+  checkInCamera.captureButton.addEventListener("click", () => captureCamera(checkInCamera));
+  checkInCamera.retakeButton.addEventListener("click", () => openCamera(checkInCamera));
+  checkOutCamera.openButton.addEventListener("click", () => openCamera(checkOutCamera));
+  checkOutCamera.captureButton.addEventListener("click", () => captureCamera(checkOutCamera));
+  checkOutCamera.retakeButton.addEventListener("click", () => openCamera(checkOutCamera));
+  window.addEventListener("beforeunload", stopAllCameras);
   $("#checkInForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const button = $("#checkInButton");
-    const file = fileOf("checkInSelfie");
-    if (!file) return showToast("Selfie wajib", "Ambil foto selfie masuk terlebih dahulu.", "error");
+    if (!capturedCheckInBlob) return showToast("Selfie wajib", "Ambil foto selfie masuk terlebih dahulu.", "error");
     setLoading(button, true, "Mengambil GPS...");
     try {
       const position = await getLocation();
       setLoading(button, true, "Mengirim absen...");
-      const selfieUrl = await api.uploadSelfie(file, employee.id, "masuk");
+      const selfieFile = blobToFile(capturedCheckInBlob, `check-in-${localDateKey()}-${Date.now()}.jpg`);
+      const selfieUrl = await api.uploadSelfie(selfieFile, employee.id, "masuk");
       todayAttendance = await api.checkIn({
         guardId: employee.id,
         pin: session.pin,
@@ -225,6 +408,7 @@ async function initEmployeeDashboard() {
         note: $("#checkInNote").value.trim()
       });
       form.reset();
+      resetCamera(checkInCamera);
       renderToday();
       await loadHistory();
       showToast("Absen masuk berhasil", todayAttendance.check_in_note || `Akurasi GPS sekitar ${position.accuracy} m.`);
@@ -239,13 +423,13 @@ async function initEmployeeDashboard() {
     event.preventDefault();
     const form = event.currentTarget;
     const button = $("#checkOutButton");
-    const file = fileOf("checkOutSelfie");
-    if (!file) return showToast("Selfie wajib", "Ambil foto selfie pulang terlebih dahulu.", "error");
+    if (!capturedCheckOutBlob) return showToast("Selfie wajib", "Ambil foto selfie pulang terlebih dahulu.", "error");
     setLoading(button, true, "Mengambil GPS...");
     try {
       const position = await getLocation();
       setLoading(button, true, "Mengirim absen...");
-      const selfieUrl = await api.uploadSelfie(file, employee.id, "pulang");
+      const selfieFile = blobToFile(capturedCheckOutBlob, `check-out-${localDateKey()}-${Date.now()}.jpg`);
+      const selfieUrl = await api.uploadSelfie(selfieFile, employee.id, "pulang");
       todayAttendance = await api.checkOut({
         guardId: employee.id,
         pin: session.pin,
@@ -259,6 +443,7 @@ async function initEmployeeDashboard() {
         overtimeNote: $("#overtimeNote").value.trim()
       });
       form.reset();
+      resetCamera(checkOutCamera);
       renderToday();
       await loadHistory();
       showToast("Absen pulang berhasil", todayAttendance.check_out_note || `Status: ${todayAttendance.status}.`);
