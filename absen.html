@@ -57,14 +57,46 @@
     <section class="grid-2">
       <form id="checkInForm" class="data-section form-stack">
         <div class="table-meta no-pad"><div><h2>Absen Masuk</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
-        <label class="field"><span>Foto selfie masuk</span><input id="checkInSelfie" type="file" accept="image/*" capture="user" required></label>
+        <div class="camera-capture-card" data-camera-card="check-in">
+          <div class="camera-frame">
+            <div id="checkInCameraPlaceholder" class="camera-placeholder">
+              <i data-lucide="camera"></i>
+              <strong>Kamera masuk belum dibuka</strong>
+              <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
+            </div>
+            <video id="checkInVideo" class="camera-video hidden" autoplay playsinline muted></video>
+            <canvas id="checkInCanvas" class="hidden"></canvas>
+            <img id="checkInPreview" class="camera-preview hidden" alt="Preview selfie masuk">
+          </div>
+          <div class="camera-actions">
+            <button id="openCheckInCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Masuk</span></button>
+            <button id="captureCheckInPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Masuk</span></button>
+            <button id="retakeCheckInPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Masuk</span></button>
+          </div>
+        </div>
         <label class="field"><span>Keterangan jika di luar jam/radius</span><textarea id="checkInNote" rows="3" placeholder="Opsional"></textarea></label>
         <button id="checkInButton" class="button button-primary button-block" type="submit"><i data-lucide="camera"></i><span>Ambil GPS & Absen Masuk</span></button>
       </form>
 
       <form id="checkOutForm" class="data-section form-stack">
         <div class="table-meta no-pad"><div><h2>Absen Pulang</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
-        <label class="field"><span>Foto selfie pulang</span><input id="checkOutSelfie" type="file" accept="image/*" capture="user" required></label>
+        <div class="camera-capture-card" data-camera-card="check-out">
+          <div class="camera-frame">
+            <div id="checkOutCameraPlaceholder" class="camera-placeholder">
+              <i data-lucide="camera"></i>
+              <strong>Kamera pulang belum dibuka</strong>
+              <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
+            </div>
+            <video id="checkOutVideo" class="camera-video hidden" autoplay playsinline muted></video>
+            <canvas id="checkOutCanvas" class="hidden"></canvas>
+            <img id="checkOutPreview" class="camera-preview hidden" alt="Preview selfie pulang">
+          </div>
+          <div class="camera-actions">
+            <button id="openCheckOutCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Pulang</span></button>
+            <button id="captureCheckOutPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Pulang</span></button>
+            <button id="retakeCheckOutPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Pulang</span></button>
+          </div>
+        </div>
         <label class="field"><span>Keterangan pulang cepat / luar radius</span><textarea id="checkOutNote" rows="3" placeholder="Opsional"></textarea></label>
         <label class="toggle-row"><span><strong>Absen lembur</strong><small>Centang jika pulang sebagai lembur.</small></span><input id="isOvertime" type="checkbox"><span class="toggle-control"></span></label>
         <label class="field"><span>Catatan lembur</span><input id="overtimeNote" type="text" placeholder="Contoh: pengamanan acara"></label>
