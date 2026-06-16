@@ -1,11 +1,11 @@
-import { api, isConfigured, isDemoMode, BAGIAN_VALUES, ADMIN_BAGIAN_VALUES, ROLE_LABELS, REQUEST_LABELS, REQUEST_STATUS_LABELS } from "./supabase.js";
+import { api, isConfigured, isDemoMode, BAGIAN_VALUES, ADMIN_BAGIAN_VALUES, SHIFT_VALUES, ROLE_LABELS, REQUEST_LABELS, REQUEST_STATUS_LABELS, ANNOUNCEMENT_PRIORITY_LABELS } from "./supabase.js";
 
 const ADMIN_SESSION_KEY = "gkn_admin_session_v2";
 const APP_TIME_ZONE = "Asia/Makassar";
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
-const state = { token: "", admin: null, employees: [], attendance: [], requests: [], admins: [], office: null, currentRows: [] };
+const state = { token: "", admin: null, employees: [], attendance: [], requests: [], admins: [], office: null, schedules: [], overtime: [], announcements: [], currentRows: [] };
 
 function icons() { if (window.lucide) window.lucide.createIcons(); }
 function esc(value) { return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
@@ -235,6 +235,15 @@ async function loadRequestView(kind) {
   const section = document.querySelector(`.request-view[data-kind="${kind}"]`);
   const rows = await api.listRequests(state.token, kind);
   state.requests = rows;
+  const decisionHtml = (row) => {
+    if (state.admin.role === "super_admin") {
+      return `<div class="decision-actions"><select class="decision-select" data-revise-status="${esc(row.id)}" data-kind="${kind}"><option value="pending" ${row.status === "pending" ? "selected" : ""}>Menunggu</option><option value="approved" ${row.status === "approved" ? "selected" : ""}>Disetujui</option><option value="rejected" ${row.status === "rejected" ? "selected" : ""}>Ditolak</option></select><button class="button button-small button-secondary" data-view-logs="${esc(row.id)}">Log</button></div>`;
+    }
+    if (row.status === "pending") {
+      return `<div class="decision-actions"><button class="button button-small button-approve" data-decide="${esc(row.id)}" data-status="approved" data-kind="${kind}">Setujui</button><button class="button button-small button-reject" data-decide="${esc(row.id)}" data-status="rejected" data-kind="${kind}">Tolak</button></div>`;
+    }
+    return `<span class="cell-secondary">Final</span>`;
+  };
   section.innerHTML = `
     <section class="data-section">
       <div class="table-meta"><div><h2>Pengajuan ${REQUEST_LABELS[kind]}</h2><p>${rows.length} data pengajuan.</p></div><button class="icon-button" data-refresh-request="${kind}"><i data-lucide="refresh-cw"></i></button></div>
@@ -245,7 +254,7 @@ async function loadRequestView(kind) {
           <td>${esc(formatDate(row.tanggal_mulai))}${row.tanggal_selesai !== row.tanggal_mulai ? `<span class="cell-secondary">s.d. ${esc(formatDate(row.tanggal_selesai))}</span>` : ""}</td>
           <td>${esc(row.alasan)}${row.bukti_url ? `<span class="cell-secondary"><a href="${esc(row.bukti_url)}" target="_blank">Lihat bukti</a></span>` : ""}${row.catatan_admin ? `<span class="cell-secondary">Catatan: ${esc(row.catatan_admin)}</span>` : ""}</td>
           <td>${badge(REQUEST_STATUS_LABELS[row.status] || row.status, statusClass(row.status))}</td>
-          <td class="align-right">${row.status === "pending" ? `<div class="decision-actions"><button class="button button-small button-approve" data-decide="${esc(row.id)}" data-status="approved" data-kind="${kind}">Setujui</button><button class="button button-small button-reject" data-decide="${esc(row.id)}" data-status="rejected" data-kind="${kind}">Tolak</button></div>` : "-"}</td>
+          <td class="align-right">${decisionHtml(row)}</td>
         </tr>`).join("")}</tbody></table><div class="empty-state ${rows.length ? "hidden" : ""}"><i data-lucide="inbox"></i><strong>Belum ada pengajuan</strong></div></div>
     </section>
   `;
@@ -269,6 +278,79 @@ async function loadAdmins() {
   `).join("");
   icons();
 }
+async function loadSchedules() {
+  if (state.admin.role !== "super_admin") return showAccessDenied();
+  state.schedules = await api.listWorkSchedules(state.token);
+  $("#scheduleList").innerHTML = state.schedules.map((item) => `
+    <form class="schedule-card" data-schedule-form="${esc(item.id)}">
+      <input type="hidden" name="id" value="${esc(item.id)}">
+      <label class="field"><span>Shift</span><select name="shift_name">${SHIFT_VALUES.map((shift) => `<option value="${esc(shift)}" ${shift === item.shift_name ? "selected" : ""}>${esc(shift)}</option>`).join("")}</select></label>
+      <div class="form-row"><label class="field"><span>Jam masuk</span><input name="check_in_time" type="time" value="${esc(String(item.check_in_time).slice(0, 5))}" required></label><label class="field"><span>Jam pulang</span><input name="check_out_time" type="time" value="${esc(String(item.check_out_time).slice(0, 5))}" required></label></div>
+      <div class="form-row"><label class="field"><span>Toleransi terlambat (menit)</span><input name="late_tolerance_minutes" type="number" min="0" value="${esc(item.late_tolerance_minutes || 0)}"></label><label class="field"><span>Toleransi pulang cepat (menit)</span><input name="early_checkout_tolerance_minutes" type="number" min="0" value="${esc(item.early_checkout_tolerance_minutes || 0)}"></label></div>
+      <label class="toggle-row"><span><strong>Aktif</strong><small>Shift dapat dipakai pegawai.</small></span><input name="is_active" type="checkbox" ${item.is_active ? "checked" : ""}><span class="toggle-control"></span></label>
+      <button class="button button-primary" type="submit"><i data-lucide="save"></i><span>Simpan Shift</span></button>
+    </form>
+  `).join("");
+  icons();
+}
+async function loadOvertimeReport() {
+  const section = $("#overtimeReportView");
+  if (!section.innerHTML.trim()) {
+    section.innerHTML = `
+      <section class="data-section">
+        <div class="table-meta"><div><h2>Laporan Lembur</h2><p>Data lembur disaring sesuai role dan bagian admin.</p></div><button class="icon-button" data-refresh-overtime><i data-lucide="refresh-cw"></i></button></div>
+        <div class="filters-grid"><label class="field"><span>Mulai</span><input id="overtimeStart" type="date" value="${localMonthKey()}-01"></label><label class="field"><span>Selesai</span><input id="overtimeEnd" type="date" value="${localDateKey()}"></label><label class="field"><span>Bagian</span><select id="overtimeBagian" data-section-filter><option value="">Semua</option></select></label></div>
+        <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pegawai</th><th>Bagian</th><th>Mulai</th><th>Selesai</th><th>Durasi</th><th>Status</th><th>Selfie</th></tr></thead><tbody id="overtimeReportBody"></tbody></table><div id="overtimeReportEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Data lembur tidak ditemukan</strong></div></div>
+      </section>
+    `;
+    fillBagianSelect($("#overtimeBagian"), true);
+    applyRoleVisibility();
+    ["overtimeStart", "overtimeEnd", "overtimeBagian"].forEach((id) => $(`#${id}`).addEventListener("input", loadOvertimeReport));
+    section.querySelector("[data-refresh-overtime]").addEventListener("click", loadOvertimeReport);
+  }
+  const start = $("#overtimeStart").value || `${localMonthKey()}-01`;
+  const end = $("#overtimeEnd").value || localDateKey();
+  const bagian = $("#overtimeBagian").value || "";
+  const rows = (await api.listOvertimeAttendance(state.token, start, end)).filter((row) => !bagian || row.bagian === bagian);
+  state.overtime = rows;
+  $("#overtimeReportEmpty").classList.toggle("hidden", rows.length > 0);
+  $("#overtimeReportBody").innerHTML = rows.map((row) => `
+    <tr>
+      <td>${esc(formatDate(row.date))}</td>
+      <td><span class="cell-primary">${esc(row.guard_name)}</span><span class="cell-secondary">${esc(row.note || "-")}</span></td>
+      <td>${esc(row.bagian)}</td>
+      <td>${row.overtime_start_time ? `${formatTime(row.overtime_start_time)} WITA` : "-"}</td>
+      <td>${row.overtime_end_time ? `${formatTime(row.overtime_end_time)} WITA` : "-"}</td>
+      <td>${esc(row.overtime_duration || "-")}</td>
+      <td>${badge(row.status, row.status === "selesai" ? "status-present" : "status-late")}</td>
+      <td>${row.start_selfie_url ? `<button class="photo-thumb" data-photo="${esc(row.start_selfie_url)}"><img src="${esc(row.start_selfie_url)}" alt=""></button>` : "-"} ${row.end_selfie_url ? `<button class="photo-thumb" data-photo="${esc(row.end_selfie_url)}"><img src="${esc(row.end_selfie_url)}" alt=""></button>` : ""}</td>
+    </tr>
+  `).join("");
+  icons();
+}
+function resetAnnouncementForm() {
+  $("#announcementForm").reset();
+  $("#announcementEditId").value = "";
+  $("#announcementStart").value = localDateKey();
+  $("#announcementEnd").value = localDateKey();
+  $("#announcementActive").checked = true;
+  $("#cancelAnnouncementEdit").classList.add("hidden");
+}
+async function loadAnnouncementsAdmin() {
+  if (state.admin.role !== "super_admin") return showAccessDenied();
+  state.announcements = await api.listAnnouncements(state.token);
+  $("#announcementsAdminEmpty").classList.toggle("hidden", state.announcements.length > 0);
+  $("#announcementsAdminList").innerHTML = state.announcements.map((item) => `
+    <article class="announcement-card announcement-${esc(item.priority)}">
+      <div><span class="status-badge ${item.priority === "darurat" ? "status-inactive" : item.priority === "penting" ? "status-late" : "status-neutral"}">${esc(ANNOUNCEMENT_PRIORITY_LABELS[item.priority] || item.priority)}</span>${badge(item.is_active ? "Aktif" : "Nonaktif", statusClass(item.is_active ? "aktif" : "nonaktif"))}</div>
+      <h3>${esc(item.title)}</h3>
+      <p>${esc(item.message)}</p>
+      <small>Target: ${esc(item.target_bagian)} - ${esc(formatDate(item.start_date))} s.d. ${esc(formatDate(item.end_date))}</small>
+      <div class="horizontal-actions"><button class="button button-small button-secondary" data-edit-announcement="${esc(item.id)}">Edit</button><button class="button button-small button-reject" data-delete-announcement="${esc(item.id)}">Hapus</button></div>
+    </article>
+  `).join("");
+  icons();
+}
 async function loadLocation() {
   if (state.admin.role !== "super_admin") return showAccessDenied();
   state.office = await api.adminGetOfficeLocation(state.token);
@@ -289,6 +371,9 @@ async function switchView(button) {
     if (["izinView", "sakitView", "cutiView", "lemburView"].includes(id)) await loadRequestView(document.querySelector(`#${id}`).dataset.kind);
     if (id === "adminsView") await loadAdmins();
     if (id === "locationView") await loadLocation();
+    if (id === "schedulesView") await loadSchedules();
+    if (id === "announcementsView") await loadAnnouncementsAdmin();
+    if (id === "overtimeReportView") await loadOvertimeReport();
   } catch (error) {
     showToast("Data gagal dimuat", errorMessage(error), "error");
   }
@@ -344,7 +429,9 @@ function exportRows(rows) {
     Lembur: row.is_overtime ? "Ya" : "Tidak",
     "Catatan Lembur": row.overtime_note || "",
     "Maps Masuk": row.check_in_latitude ? `https://www.google.com/maps?q=${row.check_in_latitude},${row.check_in_longitude}` : "",
-    "Maps Pulang": row.check_out_latitude ? `https://www.google.com/maps?q=${row.check_out_latitude},${row.check_out_longitude}` : ""
+    "Maps Pulang": row.check_out_latitude ? `https://www.google.com/maps?q=${row.check_out_latitude},${row.check_out_longitude}` : "",
+    "Selfie Masuk": row.check_in_selfie_url || "",
+    "Selfie Pulang": row.check_out_selfie_url || ""
   }));
 }
 async function exportAttendance(format) {
@@ -359,12 +446,28 @@ async function exportAttendance(format) {
   if (format === "xlsx") {
     if (!window.XLSX) return showToast("Excel belum siap", "Pustaka XLSX gagal dimuat.", "error");
     const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(data), "Absensi GKN");
+    const headers = Object.keys(data[0]);
+    const rows = [
+      ["ABSENSI GKN MAMUJU"],
+      ["LAPORAN KEHADIRAN PEGAWAI"],
+      [`Periode ${start} s.d. ${end}`],
+      [],
+      headers,
+      ...data.map((row) => headers.map((key) => row[key]))
+    ];
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(rows), "Absensi GKN");
     window.XLSX.writeFile(wb, `${filename}.xlsx`);
   } else {
     const headers = Object.keys(data[0]);
     const cell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const csv = [headers.map(cell).join(","), ...data.map((row) => headers.map((key) => cell(row[key])).join(","))].join("\r\n");
+    const csv = [
+      cell("ABSENSI GKN MAMUJU"),
+      cell("LAPORAN KEHADIRAN PEGAWAI"),
+      cell(`Periode ${start} s.d. ${end}`),
+      "",
+      headers.map(cell).join(","),
+      ...data.map((row) => headers.map((key) => cell(row[key])).join(","))
+    ].join("\r\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url; a.download = `${filename}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -379,9 +482,13 @@ async function init() {
   $("#adminToday").textContent = formatDate(new Date(), { weekday: "long", month: "long" });
   ["employeeBagianFilter", "exportBagian"].forEach((id) => fillBagianSelect($(`#${id}`), true));
   fillBagianSelect($("#employeeFormBagian"));
+  $("#employeeFormShift").innerHTML = SHIFT_VALUES.map((shift) => `<option value="${esc(shift)}">${esc(shift)}</option>`).join("");
   fillAdminBagianSelect($("#adminFormBagian"));
+  fillAdminBagianSelect($("#announcementTarget"));
   $("#exportStart").value = `${localMonthKey()}-01`;
   $("#exportEnd").value = localDateKey();
+  $("#announcementStart").value = localDateKey();
+  $("#announcementEnd").value = localDateKey();
 
   $("#adminLoginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -452,8 +559,21 @@ async function init() {
 
   document.addEventListener("click", async (event) => {
     const decision = event.target.closest("[data-decide]");
+    const logsButton = event.target.closest("[data-view-logs]");
     const photo = event.target.closest("[data-photo]");
     if (photo) { $("#photoModalImage").src = photo.dataset.photo; return openModal($("#photoModal")); }
+    if (logsButton) {
+      try {
+        const logs = await api.listRequestLogs(state.token, logsButton.dataset.viewLogs);
+        const text = logs.length
+          ? logs.map((log) => `${formatDate(log.created_at)}: ${REQUEST_STATUS_LABELS[log.old_status] || log.old_status || "-"} -> ${REQUEST_STATUS_LABELS[log.new_status] || log.new_status}${log.note ? ` (${log.note})` : ""}`).join("\n")
+          : "Belum ada log revisi.";
+        alert(text);
+      } catch (error) {
+        showToast("Log gagal dimuat", errorMessage(error), "error");
+      }
+      return;
+    }
     if (!decision) return;
     const note = prompt("Catatan admin (opsional):", "") ?? "";
     try {
@@ -463,6 +583,22 @@ async function init() {
       renderDashboard();
       showToast("Pengajuan diperbarui", REQUEST_STATUS_LABELS[decision.dataset.status]);
     } catch (error) { showToast("Keputusan gagal", errorMessage(error), "error"); }
+  });
+
+  document.addEventListener("change", async (event) => {
+    const select = event.target.closest("[data-revise-status]");
+    if (!select) return;
+    const note = prompt("Catatan revisi Super Admin:", "") ?? "";
+    try {
+      await api.decideRequest(state.token, select.dataset.reviseStatus, select.value, note);
+      await loadRequestView(select.dataset.kind);
+      state.requests = await api.listRequests(state.token);
+      renderDashboard();
+      showToast("Status pengajuan direvisi", REQUEST_STATUS_LABELS[select.value]);
+    } catch (error) {
+      showToast("Revisi gagal", errorMessage(error), "error");
+      await loadRequestView(select.dataset.kind);
+    }
   });
 
   $("#addAdminButton").addEventListener("click", () => openAdminForm());
@@ -523,6 +659,88 @@ async function init() {
       showToast("Lokasi absen tersimpan");
     } catch (error) { showToast("Lokasi gagal disimpan", errorMessage(error), "error"); }
     finally { setLoading(button, false); }
+  });
+  $("#refreshSchedules").addEventListener("click", loadSchedules);
+  $("#scheduleList").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target.closest("[data-schedule-form]");
+    const button = form.querySelector("button[type='submit']");
+    const data = new FormData(form);
+    const payload = {
+      id: data.get("id"),
+      shift_name: data.get("shift_name"),
+      check_in_time: data.get("check_in_time"),
+      check_out_time: data.get("check_out_time"),
+      late_tolerance_minutes: data.get("late_tolerance_minutes"),
+      early_checkout_tolerance_minutes: data.get("early_checkout_tolerance_minutes"),
+      is_active: data.get("is_active") === "on"
+    };
+    setLoading(button, true, "Menyimpan...");
+    try {
+      await api.saveWorkSchedule(state.token, payload);
+      await loadSchedules();
+      showToast("Jadwal shift tersimpan");
+    } catch (error) {
+      showToast("Jadwal gagal disimpan", errorMessage(error), "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+  $("#announcementForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const payload = {
+      id: $("#announcementEditId").value || null,
+      title: $("#announcementTitle").value.trim(),
+      message: $("#announcementMessage").value.trim(),
+      target_bagian: $("#announcementTarget").value,
+      priority: $("#announcementPriority").value,
+      start_date: $("#announcementStart").value,
+      end_date: $("#announcementEnd").value,
+      is_active: $("#announcementActive").checked
+    };
+    if (payload.end_date < payload.start_date) return showToast("Tanggal tidak valid", "Tanggal selesai tidak boleh sebelum mulai.", "error");
+    setLoading(button, true, "Menyimpan...");
+    try {
+      await api.saveAnnouncement(state.token, payload);
+      resetAnnouncementForm();
+      await loadAnnouncementsAdmin();
+      showToast("Pemberitahuan tersimpan");
+    } catch (error) {
+      showToast("Pemberitahuan gagal disimpan", errorMessage(error), "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+  $("#cancelAnnouncementEdit").addEventListener("click", resetAnnouncementForm);
+  $("#refreshAnnouncements").addEventListener("click", loadAnnouncementsAdmin);
+  $("#announcementsAdminList").addEventListener("click", async (event) => {
+    const edit = event.target.closest("[data-edit-announcement]");
+    const del = event.target.closest("[data-delete-announcement]");
+    if (edit) {
+      const row = state.announcements.find((item) => item.id === edit.dataset.editAnnouncement);
+      if (!row) return;
+      $("#announcementEditId").value = row.id;
+      $("#announcementTitle").value = row.title;
+      $("#announcementMessage").value = row.message;
+      $("#announcementTarget").value = row.target_bagian;
+      $("#announcementPriority").value = row.priority;
+      $("#announcementStart").value = row.start_date;
+      $("#announcementEnd").value = row.end_date;
+      $("#announcementActive").checked = row.is_active;
+      $("#cancelAnnouncementEdit").classList.remove("hidden");
+    }
+    if (del) {
+      const row = state.announcements.find((item) => item.id === del.dataset.deleteAnnouncement);
+      if (!row || !confirm(`Hapus pemberitahuan "${row.title}"?`)) return;
+      try {
+        await api.deleteAnnouncement(state.token, row.id);
+        await loadAnnouncementsAdmin();
+        showToast("Pemberitahuan dihapus");
+      } catch (error) {
+        showToast("Pemberitahuan gagal dihapus", errorMessage(error), "error");
+      }
+    }
   });
   $("#exportExcel").addEventListener("click", () => exportAttendance("xlsx"));
   $("#exportCsv").addEventListener("click", () => exportAttendance("csv"));

@@ -10,23 +10,28 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-page="employee-dashboard">
-  <header class="app-header">
+<body data-page="employee-dashboard" class="theme-kemenkeu">
+  <span class="logo-watermark" aria-hidden="true"></span>
+  <header class="app-header official-header">
     <a class="brand brand-compact" href="index.html">
-      <span class="brand-mark"><i data-lucide="building-2"></i></span>
-      <span><strong>ABSENSI GKN</strong><small>Dashboard Pegawai</small></span>
+      <span class="brand-mark">
+        <img class="brand-logo official-logo" src="assets/logo-kemenkeu.png" alt="Logo Kemenkeu" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');">
+        <i class="hidden" data-lucide="building-2"></i>
+      </span>
+      <span><strong>ABSENSI GKN MAMUJU</strong><small>Dashboard Pegawai</small></span>
     </a>
     <button id="employeeLogout" class="button button-quiet" type="button"><i data-lucide="log-out"></i><span>Keluar</span></button>
   </header>
 
-  <main class="employee-shell">
-    <section class="hero-card">
+  <main class="employee-shell employee-dashboard-shell">
+    <section class="hero-card employee-profile-card">
       <div class="profile-head">
         <img id="profilePhoto" class="profile-photo" alt="Foto profil pegawai">
         <div>
           <span class="eyebrow">Pegawai GKN Mamuju</span>
           <h1 id="welcomeName">Halo, Pegawai</h1>
           <p id="employeeMeta">Bagian - Shift</p>
+          <p id="employeeScheduleMeta">Jam kerja: -</p>
         </div>
       </div>
       <div class="clock-panel">
@@ -38,103 +43,158 @@
 
     <div id="configNotice" class="notice notice-warning hidden"><i data-lucide="triangle-alert"></i><span>Supabase belum dikonfigurasi.</span></div>
 
-    <section class="grid-2">
-      <article class="data-section">
-        <div class="table-meta"><div><span class="eyebrow">Kehadiran Hari Ini</span><h2 id="todayTitle">Status Absensi</h2></div><span id="attendanceBadge" class="status-badge status-neutral">Belum Absen</span></div>
-        <div class="attendance-timeline">
-          <article class="timeline-item" id="checkInTimeline"><span class="timeline-icon"><i data-lucide="log-in"></i></span><div><span>Absen Masuk</span><strong id="checkInValue">Belum tercatat</strong></div></article>
-          <span class="timeline-line"></span>
-          <article class="timeline-item" id="checkOutTimeline"><span class="timeline-icon"><i data-lucide="log-out"></i></span><div><span>Absen Pulang</span><strong id="checkOutValue">Belum tercatat</strong></div></article>
-        </div>
-      </article>
-
-      <article class="data-section">
-        <div class="table-meta"><div><h2>Aturan Jam Kerja</h2><p>Masuk maksimal 07:35, pulang minimal 17:00 WITA.</p></div></div>
-        <div id="officeLocationInfo" class="info-strip"><i data-lucide="map-pin"></i><p>Memuat lokasi absen...</p></div>
-      </article>
+    <section class="quick-summary-grid">
+      <article class="summary-card"><span>Absen Masuk</span><strong id="checkInValue">Belum tercatat</strong></article>
+      <article class="summary-card"><span>Absen Pulang</span><strong id="checkOutValue">Belum tercatat</strong></article>
+      <article class="summary-card"><span>Status Hari Ini</span><strong id="attendanceBadge" class="status-badge status-neutral">Belum Absen</strong></article>
+      <article class="summary-card"><span>Lokasi / Radius</span><strong id="summaryLocationRadius">Memuat...</strong></article>
     </section>
 
-    <section class="grid-2">
-      <form id="checkInForm" class="data-section form-stack">
-        <div class="table-meta no-pad"><div><h2>Absen Masuk</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
-        <div class="camera-capture-card" data-camera-card="check-in">
-          <div class="camera-frame">
-            <div id="checkInCameraPlaceholder" class="camera-placeholder">
-              <i data-lucide="camera"></i>
-              <strong>Kamera masuk belum dibuka</strong>
-              <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
-            </div>
-            <video id="checkInVideo" class="camera-video hidden" autoplay playsinline muted></video>
-            <canvas id="checkInCanvas" class="hidden"></canvas>
-            <img id="checkInPreview" class="camera-preview hidden" alt="Preview selfie masuk">
-          </div>
-          <div class="camera-actions">
-            <button id="openCheckInCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Masuk</span></button>
-            <button id="captureCheckInPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Masuk</span></button>
-            <button id="retakeCheckInPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Masuk</span></button>
-          </div>
-        </div>
-        <label class="field"><span>Keterangan jika di luar jam/radius</span><textarea id="checkInNote" rows="3" placeholder="Opsional"></textarea></label>
-        <button id="checkInButton" class="button button-primary button-block" type="submit"><i data-lucide="camera"></i><span>Ambil GPS & Absen Masuk</span></button>
-      </form>
-
-      <form id="checkOutForm" class="data-section form-stack">
-        <div class="table-meta no-pad"><div><h2>Absen Pulang</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
-        <div class="camera-capture-card" data-camera-card="check-out">
-          <div class="camera-frame">
-            <div id="checkOutCameraPlaceholder" class="camera-placeholder">
-              <i data-lucide="camera"></i>
-              <strong>Kamera pulang belum dibuka</strong>
-              <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
-            </div>
-            <video id="checkOutVideo" class="camera-video hidden" autoplay playsinline muted></video>
-            <canvas id="checkOutCanvas" class="hidden"></canvas>
-            <img id="checkOutPreview" class="camera-preview hidden" alt="Preview selfie pulang">
-          </div>
-          <div class="camera-actions">
-            <button id="openCheckOutCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Pulang</span></button>
-            <button id="captureCheckOutPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Pulang</span></button>
-            <button id="retakeCheckOutPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Pulang</span></button>
-          </div>
-        </div>
-        <label class="field"><span>Keterangan pulang cepat / luar radius</span><textarea id="checkOutNote" rows="3" placeholder="Opsional"></textarea></label>
-        <label class="toggle-row"><span><strong>Absen lembur</strong><small>Centang jika pulang sebagai lembur.</small></span><input id="isOvertime" type="checkbox"><span class="toggle-control"></span></label>
-        <label class="field"><span>Catatan lembur</span><input id="overtimeNote" type="text" placeholder="Contoh: pengamanan acara"></label>
-        <button id="checkOutButton" class="button button-dark button-block" type="submit"><i data-lucide="door-open"></i><span>Ambil GPS & Absen Pulang</span></button>
-      </form>
+    <section id="announcementsSection" class="data-section compact-section">
+      <div class="table-meta">
+        <div><h2>Pemberitahuan</h2><p>Pesan dari Super Admin untuk pegawai.</p></div>
+        <span id="announcementBadge" class="status-badge status-late hidden">Pesan Baru</span>
+      </div>
+      <div id="announcementList" class="announcement-list"></div>
+      <div id="announcementEmpty" class="empty-state compact-empty hidden"><i data-lucide="inbox"></i><strong>Tidak ada pemberitahuan aktif</strong></div>
     </section>
 
-    <section class="grid-2">
-      <form id="requestForm" class="data-section form-stack">
-        <div class="table-meta no-pad"><div><h2>Pengajuan</h2><p>Izin, sakit, cuti, atau lembur.</p></div></div>
+    <nav class="employee-tabs" aria-label="Menu dashboard pegawai">
+      <button class="employee-tab active" type="button" data-employee-tab="attendanceTab"><i data-lucide="scan-face"></i><span>Absensi</span></button>
+      <button class="employee-tab" type="button" data-employee-tab="requestTab"><i data-lucide="file-clock"></i><span>Pengajuan</span></button>
+      <button class="employee-tab" type="button" data-employee-tab="historyTab"><i data-lucide="history"></i><span>Riwayat</span></button>
+      <button class="employee-tab" type="button" data-employee-tab="profileTab"><i data-lucide="user-round"></i><span>Profil</span></button>
+    </nav>
+
+    <section id="attendanceTab" class="employee-tab-panel">
+      <section class="grid-2 attendance-card-grid">
+        <form id="checkInForm" class="data-section form-stack attendance-action-card">
+          <div class="table-meta no-pad"><div><h2>Absen Masuk</h2><p>Ambil selfie, lalu sistem mengambil GPS otomatis saat disimpan.</p></div></div>
+          <div class="camera-capture-card camera-compact" data-camera-card="check-in">
+            <div class="camera-frame">
+              <div id="checkInCameraPlaceholder" class="camera-placeholder">
+                <i data-lucide="camera"></i>
+                <strong>Kamera masuk belum dibuka</strong>
+                <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
+              </div>
+              <video id="checkInVideo" class="camera-video hidden" autoplay playsinline muted></video>
+              <canvas id="checkInCanvas" class="hidden"></canvas>
+              <img id="checkInPreview" class="camera-preview hidden" alt="Preview selfie masuk">
+            </div>
+            <div class="camera-actions">
+              <button id="openCheckInCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Masuk</span></button>
+              <button id="captureCheckInPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Masuk</span></button>
+              <button id="retakeCheckInPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Masuk</span></button>
+            </div>
+          </div>
+          <label class="field"><span>Keterangan jika di luar jam/radius</span><textarea id="checkInNote" rows="3" placeholder="Opsional"></textarea></label>
+          <button id="checkInButton" class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Simpan Absen Masuk</span></button>
+          <small class="form-help">GPS akan diambil otomatis saat absen disimpan.</small>
+          <div id="checkInLocationResult" class="result-strip hidden"></div>
+        </form>
+
+        <form id="checkOutForm" class="data-section form-stack attendance-action-card">
+          <div class="table-meta no-pad"><div><h2>Absen Pulang</h2><p>Ambil selfie pulang, lalu simpan absensi dalam satu tombol.</p></div></div>
+          <div class="camera-capture-card camera-compact" data-camera-card="check-out">
+            <div class="camera-frame">
+              <div id="checkOutCameraPlaceholder" class="camera-placeholder">
+                <i data-lucide="camera"></i>
+                <strong>Kamera pulang belum dibuka</strong>
+                <span>Pastikan wajah terlihat jelas sebelum mengambil foto.</span>
+              </div>
+              <video id="checkOutVideo" class="camera-video hidden" autoplay playsinline muted></video>
+              <canvas id="checkOutCanvas" class="hidden"></canvas>
+              <img id="checkOutPreview" class="camera-preview hidden" alt="Preview selfie pulang">
+            </div>
+            <div class="camera-actions">
+              <button id="openCheckOutCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Pulang</span></button>
+              <button id="captureCheckOutPhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Pulang</span></button>
+              <button id="retakeCheckOutPhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Pulang</span></button>
+            </div>
+          </div>
+          <label class="field"><span>Keterangan pulang cepat / luar radius</span><textarea id="checkOutNote" rows="3" placeholder="Opsional"></textarea></label>
+          <button id="checkOutButton" class="button button-dark button-block" type="submit"><i data-lucide="save"></i><span>Simpan Absen Pulang</span></button>
+          <small class="form-help">GPS akan diambil otomatis saat absen disimpan.</small>
+          <div id="checkOutLocationResult" class="result-strip hidden"></div>
+        </form>
+      </section>
+
+      <section class="data-section form-stack overtime-card">
+        <div class="table-meta no-pad">
+          <div><h2>Absen Lembur</h2><p>Aktif setelah pengajuan lembur disetujui admin.</p></div>
+          <span id="overtimeStatusBadge" class="status-badge status-neutral">Belum Aktif</span>
+        </div>
+        <div id="overtimeAccessNotice" class="notice notice-warning hidden"><i data-lucide="clock-alert"></i><span>Absen lembur hanya dapat dilakukan setelah pengajuan lembur disetujui admin.</span></div>
         <div class="form-row">
-          <label class="field"><span>Jenis</span><select id="requestType" required><option value="">Pilih</option><option value="izin">Izin</option><option value="sakit">Sakit</option><option value="cuti">Cuti</option><option value="lembur">Lembur</option></select></label>
-          <label class="field"><span>Mulai</span><input id="requestStart" type="date" required></label>
-          <label class="field"><span>Selesai</span><input id="requestEnd" type="date" required></label>
+          <label class="field"><span>Pengajuan lembur disetujui</span><select id="overtimeRequestSelect"></select></label>
+          <label class="field"><span>Keterangan lembur</span><input id="overtimeNote" type="text" placeholder="Contoh: pengamanan acara malam"></label>
         </div>
-        <label class="field"><span>Bukti foto/dokumen</span><input id="requestProof" type="file" accept="image/*,.pdf"></label>
-        <label class="field"><span>Alasan</span><textarea id="requestReason" rows="3" minlength="5" required></textarea></label>
-        <button class="button button-primary" type="submit"><i data-lucide="send"></i><span>Kirim Pengajuan</span></button>
-      </form>
+        <div class="camera-capture-card camera-compact" data-camera-card="overtime">
+          <div class="camera-frame">
+            <div id="overtimeCameraPlaceholder" class="camera-placeholder">
+              <i data-lucide="camera"></i>
+              <strong>Kamera lembur belum dibuka</strong>
+              <span>Selfie dan GPS wajib untuk mulai atau selesai lembur.</span>
+            </div>
+            <video id="overtimeVideo" class="camera-video hidden" autoplay playsinline muted></video>
+            <canvas id="overtimeCanvas" class="hidden"></canvas>
+            <img id="overtimePreview" class="camera-preview hidden" alt="Preview selfie lembur">
+          </div>
+          <div class="camera-actions">
+            <button id="openOvertimeCamera" class="button button-secondary" type="button"><i data-lucide="video"></i><span>Buka Kamera Lembur</span></button>
+            <button id="captureOvertimePhoto" class="button button-primary" type="button" disabled><i data-lucide="camera"></i><span>Ambil Foto Lembur</span></button>
+            <button id="retakeOvertimePhoto" class="button button-secondary hidden" type="button"><i data-lucide="refresh-cw"></i><span>Ulangi Foto Lembur</span></button>
+          </div>
+        </div>
+        <div class="horizontal-actions overtime-actions">
+          <button id="startOvertimeButton" class="button button-primary" type="button"><i data-lucide="play"></i><span>Mulai Lembur</span></button>
+          <button id="finishOvertimeButton" class="button button-dark" type="button"><i data-lucide="square-check-big"></i><span>Selesai Lembur</span></button>
+        </div>
+        <small class="form-help">GPS akan diambil otomatis saat lembur disimpan.</small>
+        <div id="overtimeResult" class="result-strip hidden"></div>
+      </section>
 
-      <form id="profileForm" class="data-section form-stack">
+      <section class="data-section compact-section">
+        <div class="table-meta no-pad"><div><h2>Lokasi Absen</h2><p id="officeLocationInfo">Memuat lokasi absen...</p></div></div>
+      </section>
+    </section>
+
+    <section id="requestTab" class="employee-tab-panel hidden">
+      <section class="grid-2">
+        <form id="requestForm" class="data-section form-stack">
+          <div class="table-meta no-pad"><div><h2>Pengajuan Izin / Sakit / Cuti / Lembur</h2><p>Isi form ringkas lalu kirim ke admin.</p></div></div>
+          <div class="form-row">
+            <label class="field"><span>Jenis pengajuan</span><select id="requestType" required><option value="">Pilih</option><option value="izin">Izin</option><option value="sakit">Sakit</option><option value="cuti">Cuti</option><option value="lembur">Lembur</option></select></label>
+            <label class="field"><span>Tanggal mulai</span><input id="requestStart" type="date" required></label>
+            <label class="field"><span>Tanggal selesai</span><input id="requestEnd" type="date" required></label>
+          </div>
+          <label class="field"><span>Bukti foto/dokumen jika ada</span><input id="requestProof" type="file" accept="image/*,.pdf"></label>
+          <label class="field"><span>Alasan</span><textarea id="requestReason" rows="3" minlength="5" required></textarea></label>
+          <button class="button button-primary" type="submit"><i data-lucide="send"></i><span>Kirim Pengajuan</span></button>
+        </form>
+        <section class="data-section">
+          <div class="table-meta"><div><h2>Pengajuan Terakhir</h2><p>Status terbaru pengajuan pegawai.</p></div><button id="refreshRequests" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+          <div id="requestList" class="request-list compact-request-list"></div>
+          <div id="requestEmpty" class="empty-state compact-empty hidden"><i data-lucide="inbox"></i><strong>Belum ada pengajuan</strong></div>
+        </section>
+      </section>
+    </section>
+
+    <section id="historyTab" class="employee-tab-panel hidden">
+      <section class="data-section">
+        <div class="table-meta"><div><h2>Riwayat Absensi Sendiri</h2><p>Data terbaru pegawai yang sedang login.</p></div><button id="refreshHistory" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+        <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="attendanceHistoryBody"></tbody></table><div id="attendanceHistoryEmpty" class="empty-state compact-empty hidden"><i data-lucide="inbox"></i><strong>Belum ada riwayat</strong></div></div>
+      </section>
+    </section>
+
+    <section id="profileTab" class="employee-tab-panel hidden">
+      <form id="profileForm" class="data-section form-stack profile-form-card">
         <div class="table-meta no-pad"><div><h2>Profil Pegawai</h2><p>Foto profil, bio, dan PIN dapat diperbarui.</p></div></div>
         <label class="field"><span>Foto profil</span><input id="profilePhotoInput" type="file" accept="image/*"></label>
         <label class="field"><span>Bio singkat</span><textarea id="employeeBio" rows="3" placeholder="Contoh: Koordinator umum satpam"></textarea></label>
         <label class="field"><span>PIN baru</span><input id="newEmployeePin" type="password" inputmode="numeric" maxlength="20" placeholder="Kosongkan jika tidak diubah"></label>
         <button class="button button-secondary" type="submit"><i data-lucide="save"></i><span>Simpan Profil</span></button>
       </form>
-    </section>
-
-    <section class="data-section">
-      <div class="table-meta"><div><h2>Riwayat Absensi Sendiri</h2><p>Data terbaru pegawai yang sedang login.</p></div><button id="refreshHistory" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
-      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="attendanceHistoryBody"></tbody></table><div id="attendanceHistoryEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada riwayat</strong></div></div>
-    </section>
-
-    <section class="data-section">
-      <div class="table-meta"><div><h2>Status Pengajuan</h2><p>Menunggu, Disetujui, atau Ditolak.</p></div><button id="refreshRequests" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
-      <div id="requestList" class="request-list"></div>
-      <div id="requestEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada pengajuan</strong></div>
     </section>
   </main>
 

@@ -20,6 +20,7 @@ export const supabase = isConfigured
 
 export const BAGIAN_VALUES = ["Pramubakti", "Cleaning Service", "Satpam", "Teknisi", "Driver"];
 export const ADMIN_BAGIAN_VALUES = ["Semua", ...BAGIAN_VALUES];
+export const SHIFT_VALUES = ["Reguler", "Pagi", "Siang", "Malam"];
 export const ROLE_LABELS = {
   super_admin: "Super Admin",
   admin_umum: "Admin Umum",
@@ -27,6 +28,7 @@ export const ROLE_LABELS = {
 };
 export const REQUEST_LABELS = { izin: "Izin", sakit: "Sakit", cuti: "Cuti", lembur: "Lembur" };
 export const REQUEST_STATUS_LABELS = { pending: "Menunggu", approved: "Disetujui", rejected: "Ditolak" };
+export const ANNOUNCEMENT_PRIORITY_LABELS = { normal: "Normal", penting: "Penting", darurat: "Darurat" };
 
 const KEYS = {
   employees: "gkn_demo_employees_v2",
@@ -34,7 +36,12 @@ const KEYS = {
   requests: "gkn_demo_requests_v2",
   admins: "gkn_demo_admins_v2",
   sessions: "gkn_demo_admin_sessions_v2",
-  office: "gkn_demo_office_v2"
+  office: "gkn_demo_office_v2",
+  schedules: "gkn_demo_work_schedules_v2",
+  overtime: "gkn_demo_overtime_v2",
+  requestLogs: "gkn_demo_request_logs_v2",
+  announcements: "gkn_demo_announcements_v2",
+  announcementReads: "gkn_demo_announcement_reads_v2"
 };
 
 function uuid() {
@@ -107,6 +114,13 @@ const adminSeed = [
   ["Admin Driver", "admindriver", "Driver-2026!", "admin_bagian", "Driver"]
 ];
 
+const scheduleSeed = [
+  { shift_name: "Reguler", check_in_time: "07:35", check_out_time: "17:00", late_tolerance_minutes: 0, early_checkout_tolerance_minutes: 0, is_active: true },
+  { shift_name: "Pagi", check_in_time: "07:00", check_out_time: "15:00", late_tolerance_minutes: 0, early_checkout_tolerance_minutes: 0, is_active: true },
+  { shift_name: "Siang", check_in_time: "15:00", check_out_time: "23:00", late_tolerance_minutes: 0, early_checkout_tolerance_minutes: 0, is_active: true },
+  { shift_name: "Malam", check_in_time: "23:00", check_out_time: "07:00", late_tolerance_minutes: 0, early_checkout_tolerance_minutes: 0, is_active: true }
+];
+
 function seedDemo() {
   if (!isDemoMode || localStorage.getItem(KEYS.employees)) return;
   const t = nowIso();
@@ -135,15 +149,64 @@ function seedDemo() {
     jenis: "izin", tanggal_mulai: today, tanggal_selesai: today, alasan: "Keperluan keluarga.",
     bukti_url: "", status: "pending", catatan_admin: "", decided_by: null, decided_at: null,
     created_at: t, updated_at: t
+  }, {
+    id: uuid(), guard_id: first.id, guard_name: first.name, bagian: first.bagian,
+    jenis: "lembur", tanggal_mulai: today, tanggal_selesai: today, alasan: "Pengamanan kegiatan setelah jam kerja.",
+    bukti_url: "", status: "approved", catatan_admin: "Disetujui untuk demo lembur.", decided_by: admins[0].id, decided_at: t,
+    created_at: t, updated_at: t
+  }];
+  const announcements = [{
+    id: uuid(),
+    title: "Uji coba absensi digital",
+    message: "Pastikan kamera dan GPS aktif saat melakukan absen masuk, pulang, atau lembur.",
+    target_bagian: "Semua",
+    priority: "penting",
+    start_date: today,
+    end_date: today,
+    is_active: true,
+    created_by: admins[0].id,
+    created_at: t,
+    updated_at: t
   }];
   write(KEYS.employees, employees);
   write(KEYS.admins, admins);
   write(KEYS.attendance, attendance);
   write(KEYS.requests, requests);
   write(KEYS.sessions, []);
-  write(KEYS.office, { id: uuid(), nama_lokasi: "GKN Mamuju", latitude: -2.6779, longitude: 118.8865, radius_meter: 150, is_default: true, created_at: t, updated_at: t });
+  write(KEYS.schedules, scheduleSeed.map((item) => ({ id: uuid(), ...item, created_at: t, updated_at: t })));
+  write(KEYS.overtime, []);
+  write(KEYS.requestLogs, []);
+  write(KEYS.announcements, announcements);
+  write(KEYS.announcementReads, []);
+  write(KEYS.office, { id: uuid(), nama_lokasi: "Gedung Keuangan Negara Mamuju", latitude: -2.6890517, longitude: 118.87131, radius_meter: 50, is_default: true, created_at: t, updated_at: t });
 }
 seedDemo();
+
+function ensureDemoDefaults() {
+  if (!isDemoMode) return;
+  const t = nowIso();
+  if (!localStorage.getItem(KEYS.schedules)) {
+    write(KEYS.schedules, scheduleSeed.map((item) => ({ id: uuid(), ...item, created_at: t, updated_at: t })));
+  }
+  if (!localStorage.getItem(KEYS.overtime)) write(KEYS.overtime, []);
+  if (!localStorage.getItem(KEYS.requestLogs)) write(KEYS.requestLogs, []);
+  if (!localStorage.getItem(KEYS.announcements)) write(KEYS.announcements, []);
+  if (!localStorage.getItem(KEYS.announcementReads)) write(KEYS.announcementReads, []);
+  const office = read(KEYS.office, null);
+  if (!office || office.nama_lokasi === "GKN Mamuju" || Number(office.radius_meter) !== 50) {
+    write(KEYS.office, {
+      id: office?.id || uuid(),
+      nama_lokasi: "Gedung Keuangan Negara Mamuju",
+      latitude: -2.6890517,
+      longitude: 118.87131,
+      radius_meter: 50,
+      is_default: true,
+      created_at: office?.created_at || t,
+      updated_at: t
+    });
+  }
+}
+ensureDemoDefaults();
 
 function requireBackend() {
   if (!isDemoMode && !isConfigured) throw new Error("Supabase belum dikonfigurasi. Isi SUPABASE_URL dan SUPABASE_ANON_KEY.");
@@ -205,6 +268,45 @@ function locationWarning(lat, lng) {
   if (!office || lat == null || lng == null) return "";
   const distance = distanceMeters(Number(office.latitude), Number(office.longitude), Number(lat), Number(lng));
   return distance > Number(office.radius_meter) ? `Peringatan: di luar radius ${office.radius_meter} m. Jarak sekitar ${distance} m.` : "";
+}
+function locationDistance(lat, lng) {
+  const office = read(KEYS.office, null);
+  if (!office || lat == null || lng == null) return null;
+  const distance = distanceMeters(Number(office.latitude), Number(office.longitude), Number(lat), Number(lng));
+  return { distance, in_radius: distance <= Number(office.radius_meter), radius_meter: Number(office.radius_meter), nama_lokasi: office.nama_lokasi };
+}
+function demoSchedule(shift) {
+  return read(KEYS.schedules).find((item) => item.shift_name === shift && item.is_active) ||
+    read(KEYS.schedules).find((item) => item.shift_name === "Reguler") ||
+    { shift_name: "Reguler", check_in_time: "07:35", check_out_time: "17:00", late_tolerance_minutes: 0, early_checkout_tolerance_minutes: 0, is_active: true };
+}
+function timeToMinutes(value) {
+  const [h, m] = String(value || "00:00").slice(0, 5).split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+function witaMinutes(value) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Makassar", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Number(map.hour) * 60 + Number(map.minute);
+}
+function demoCheckInStatus(shift, isoTime) {
+  const schedule = demoSchedule(shift);
+  const limit = timeToMinutes(schedule.check_in_time) + Number(schedule.late_tolerance_minutes || 0);
+  return witaMinutes(isoTime) > limit ? "Terlambat" : "Hadir";
+}
+function demoCheckOutStatus(shift, isoTime, currentStatus) {
+  const schedule = demoSchedule(shift);
+  const inMinutes = timeToMinutes(schedule.check_in_time);
+  let outMinutes = timeToMinutes(schedule.check_out_time);
+  let actual = witaMinutes(isoTime);
+  if (outMinutes <= inMinutes && actual < inMinutes) {
+    outMinutes += 1440;
+    actual += 1440;
+  }
+  const early = actual < outMinutes - Number(schedule.early_checkout_tolerance_minutes || 0);
+  if (currentStatus === "Terlambat" && early) return "Terlambat dan Pulang Cepat";
+  if (early) return "Pulang Cepat";
+  return currentStatus || "Hadir";
 }
 
 export const api = {
@@ -278,12 +380,11 @@ export const api = {
       if (!employee) throw new Error("Akun pegawai tidak valid.");
       const rows = read(KEYS.attendance);
       if (rows.some((item) => item.guard_id === employee.id && item.date === payload.date)) throw new Error("Anda sudah absen masuk hari ini.");
-      const localTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Makassar", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(payload.checkInTime));
       const warning = locationWarning(payload.latitude, payload.longitude);
       const record = {
         id: uuid(), guard_id: employee.id, guard_name: employee.name, bagian: employee.bagian, shift: employee.shift,
         date: payload.date, check_in_time: payload.checkInTime, check_out_time: null, work_duration: null,
-        status: localTime > "07:35" ? "Terlambat" : "Hadir",
+        status: demoCheckInStatus(employee.shift, payload.checkInTime),
         check_in_latitude: payload.latitude, check_in_longitude: payload.longitude,
         check_out_latitude: null, check_out_longitude: null,
         check_in_selfie_url: payload.selfieUrl, check_out_selfie_url: "",
@@ -318,14 +419,8 @@ export const api = {
       const index = rows.findIndex((item) => item.guard_id === employee.id && item.date === payload.date);
       if (index < 0) throw new Error("Anda belum absen masuk hari ini.");
       if (rows[index].check_out_time) throw new Error("Anda sudah absen pulang hari ini.");
-      const localTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Makassar", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(payload.checkOutTime));
-      const early = localTime < "17:00";
-      const late = rows[index].status === "Terlambat";
       const warning = locationWarning(payload.latitude, payload.longitude);
-      let status = rows[index].status;
-      if (payload.isOvertime) status = "Lembur";
-      else if (late && early) status = "Terlambat dan Pulang Cepat";
-      else if (early) status = "Pulang Cepat";
+      const status = demoCheckOutStatus(employee.shift, payload.checkOutTime, rows[index].status);
       rows[index] = {
         ...rows[index],
         check_out_time: payload.checkOutTime,
@@ -335,8 +430,8 @@ export const api = {
         check_out_longitude: payload.longitude,
         check_out_selfie_url: payload.selfieUrl,
         check_out_note: [payload.note, warning].filter(Boolean).join(" | "),
-        is_overtime: Boolean(payload.isOvertime),
-        overtime_note: payload.overtimeNote || "",
+        is_overtime: false,
+        overtime_note: "",
         updated_at: nowIso()
       };
       write(KEYS.attendance, rows);
@@ -351,8 +446,8 @@ export const api = {
       p_longitude: payload.longitude,
       p_selfie_url: payload.selfieUrl,
       p_note: payload.note || "",
-      p_is_overtime: Boolean(payload.isOvertime),
-      p_overtime_note: payload.overtimeNote || ""
+      p_is_overtime: false,
+      p_overtime_note: ""
     });
     throwIfError(error);
     return data?.[0] || null;
@@ -388,6 +483,140 @@ export const api = {
     const { data, error } = await supabase.rpc("employee_list_requests", { p_guard_id: employeeId, p_pin: pin });
     throwIfError(error);
     return data || [];
+  },
+  async getWorkScheduleByShift(shift) {
+    requireBackend();
+    if (isDemoMode) return demoSchedule(shift);
+    const { data, error } = await supabase.rpc("get_work_schedule_by_shift", { p_shift: shift || "Reguler" });
+    throwIfError(error);
+    return data?.[0] || null;
+  },
+  async listEmployeeAnnouncements(employeeId, pin) {
+    requireBackend();
+    if (isDemoMode) {
+      const employee = read(KEYS.employees).find((item) => item.id === employeeId && item.pin === pin && item.is_active);
+      if (!employee) throw new Error("Akun pegawai tidak valid.");
+      const today = localDateKey();
+      const reads = read(KEYS.announcementReads);
+      const priorityOrder = { darurat: 0, penting: 1, normal: 2 };
+      return read(KEYS.announcements)
+        .filter((item) => item.is_active && item.start_date <= today && item.end_date >= today && (item.target_bagian === "Semua" || item.target_bagian === employee.bagian))
+        .map((item) => ({ ...item, read_at: reads.find((read) => read.announcement_id === item.id && read.guard_id === employee.id)?.read_at || null }))
+        .sort((a, b) => (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9) || b.created_at.localeCompare(a.created_at));
+    }
+    const { data, error } = await supabase.rpc("employee_list_announcements", { p_guard_id: employeeId, p_pin: pin });
+    throwIfError(error);
+    return data || [];
+  },
+  async markAnnouncementRead(employeeId, pin, announcementId) {
+    requireBackend();
+    if (isDemoMode) {
+      const employee = read(KEYS.employees).find((item) => item.id === employeeId && item.pin === pin && item.is_active);
+      if (!employee) throw new Error("Akun pegawai tidak valid.");
+      const rows = read(KEYS.announcementReads);
+      const index = rows.findIndex((item) => item.announcement_id === announcementId && item.guard_id === employee.id);
+      if (index >= 0) rows[index] = { ...rows[index], read_at: nowIso() };
+      else rows.push({ id: uuid(), announcement_id: announcementId, guard_id: employee.id, read_at: nowIso() });
+      write(KEYS.announcementReads, rows);
+      return;
+    }
+    const { error } = await supabase.rpc("employee_mark_announcement_read", { p_guard_id: employeeId, p_pin: pin, p_announcement_id: announcementId });
+    throwIfError(error);
+  },
+  async listApprovedOvertimeRequests(employeeId, pin) {
+    requireBackend();
+    if (isDemoMode) {
+      const today = localDateKey();
+      return read(KEYS.requests).filter((item) =>
+        item.guard_id === employeeId &&
+        item.jenis === "lembur" &&
+        item.status === "approved" &&
+        item.tanggal_mulai <= today &&
+        item.tanggal_selesai >= today
+      );
+    }
+    const { data, error } = await supabase.rpc("employee_list_approved_overtime_requests", { p_guard_id: employeeId, p_pin: pin });
+    throwIfError(error);
+    return data || [];
+  },
+  async getTodayOvertime(employeeId, pin, date) {
+    requireBackend();
+    if (isDemoMode) return read(KEYS.overtime).filter((item) => item.guard_id === employeeId && item.date === date).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
+    const { data, error } = await supabase.rpc("employee_get_overtime_today", { p_guard_id: employeeId, p_pin: pin, p_date: date });
+    throwIfError(error);
+    return data?.[0] || null;
+  },
+  async startOvertime(payload) {
+    requireBackend();
+    if (isDemoMode) {
+      const employee = read(KEYS.employees).find((item) => item.id === payload.guardId && item.pin === payload.pin && item.is_active);
+      if (!employee) throw new Error("Akun pegawai tidak valid.");
+      const request = read(KEYS.requests).find((item) => item.id === payload.requestId && item.guard_id === employee.id && item.jenis === "lembur" && item.status === "approved");
+      if (!request) throw new Error("Absen lembur hanya dapat dilakukan setelah pengajuan lembur disetujui admin.");
+      if (!payload.note?.trim()) throw new Error("Keterangan lembur wajib diisi.");
+      const rows = read(KEYS.overtime);
+      if (rows.some((item) => item.request_id === request.id && item.status === "berjalan")) throw new Error("Lembur masih berjalan.");
+      const warning = locationWarning(payload.latitude, payload.longitude);
+      const record = {
+        id: uuid(), guard_id: employee.id, guard_name: employee.name, bagian: employee.bagian,
+        date: payload.date, request_id: request.id, overtime_start_time: payload.time, overtime_end_time: null,
+        overtime_duration: "", start_latitude: payload.latitude, start_longitude: payload.longitude,
+        end_latitude: null, end_longitude: null, start_selfie_url: payload.selfieUrl, end_selfie_url: "",
+        note: [payload.note.trim(), warning].filter(Boolean).join(" | "), status: "berjalan",
+        created_at: nowIso(), updated_at: nowIso()
+      };
+      rows.push(record);
+      write(KEYS.overtime, rows);
+      return record;
+    }
+    const { data, error } = await supabase.rpc("employee_start_overtime", {
+      p_guard_id: payload.guardId,
+      p_pin: payload.pin,
+      p_request_id: payload.requestId,
+      p_date: payload.date,
+      p_time: payload.time,
+      p_latitude: payload.latitude,
+      p_longitude: payload.longitude,
+      p_selfie_url: payload.selfieUrl,
+      p_note: payload.note
+    });
+    throwIfError(error);
+    return data?.[0] || null;
+  },
+  async finishOvertime(payload) {
+    requireBackend();
+    if (isDemoMode) {
+      const rows = read(KEYS.overtime);
+      const index = rows.findIndex((item) => item.id === payload.overtimeId && item.guard_id === payload.guardId && item.status === "berjalan");
+      if (index < 0) throw new Error("Data lembur berjalan tidak ditemukan.");
+      const warning = locationWarning(payload.latitude, payload.longitude);
+      const duration = durationText(minutesBetween(rows[index].overtime_start_time, payload.time));
+      rows[index] = {
+        ...rows[index],
+        overtime_end_time: payload.time,
+        overtime_duration: duration,
+        end_latitude: payload.latitude,
+        end_longitude: payload.longitude,
+        end_selfie_url: payload.selfieUrl,
+        note: [rows[index].note, payload.note?.trim(), warning].filter(Boolean).join(" | "),
+        status: "selesai",
+        updated_at: nowIso()
+      };
+      write(KEYS.overtime, rows);
+      return rows[index];
+    }
+    const { data, error } = await supabase.rpc("employee_finish_overtime", {
+      p_guard_id: payload.guardId,
+      p_pin: payload.pin,
+      p_overtime_id: payload.overtimeId,
+      p_time: payload.time,
+      p_latitude: payload.latitude,
+      p_longitude: payload.longitude,
+      p_selfie_url: payload.selfieUrl,
+      p_note: payload.note || ""
+    });
+    throwIfError(error);
+    return data?.[0] || null;
   },
   async adminLogin(username, password) {
     requireBackend();
@@ -495,8 +724,12 @@ export const api = {
       const rows = read(KEYS.requests);
       const index = rows.findIndex((item) => item.id === id);
       if (index < 0 || !canAccessBagian(admin, rows[index].bagian)) throw new Error("Anda tidak memiliki akses");
+      if (admin.role !== "super_admin" && rows[index].status !== "pending") throw new Error("Hanya Super Admin yang dapat mengubah keputusan yang sudah final.");
+      if (admin.role !== "super_admin" && status === "pending") throw new Error("Hanya Super Admin yang dapat mengembalikan status menjadi menunggu.");
+      const oldStatus = rows[index].status;
       rows[index] = { ...rows[index], status, catatan_admin: note, decided_by: admin.id, decided_at: nowIso(), updated_at: nowIso() };
       write(KEYS.requests, rows);
+      write(KEYS.requestLogs, [{ id: uuid(), request_id: id, admin_id: admin.id, old_status: oldStatus, new_status: status, note, created_at: nowIso() }, ...read(KEYS.requestLogs)]);
       return;
     }
     const { error } = await supabase.rpc("admin_decide_request", { p_token: token, p_request_id: id, p_status: status, p_catatan: note });
@@ -548,6 +781,128 @@ export const api = {
       return;
     }
     const { error } = await supabase.rpc("admin_delete_user", { p_token: token, p_admin_id: id });
+    throwIfError(error);
+  },
+  async listWorkSchedules(token) {
+    requireBackend();
+    if (isDemoMode) {
+      requireSuper(demoAdmin(token));
+      return read(KEYS.schedules).sort((a, b) => SHIFT_VALUES.indexOf(a.shift_name) - SHIFT_VALUES.indexOf(b.shift_name));
+    }
+    const { data, error } = await supabase.rpc("admin_list_work_schedules", { p_token: token });
+    throwIfError(error);
+    return data || [];
+  },
+  async saveWorkSchedule(token, payload) {
+    requireBackend();
+    if (isDemoMode) {
+      requireSuper(demoAdmin(token));
+      const rows = read(KEYS.schedules);
+      const index = rows.findIndex((item) => item.id === payload.id || item.shift_name === payload.shift_name);
+      const next = {
+        id: payload.id || rows[index]?.id || uuid(),
+        shift_name: payload.shift_name,
+        check_in_time: payload.check_in_time,
+        check_out_time: payload.check_out_time,
+        late_tolerance_minutes: Number(payload.late_tolerance_minutes || 0),
+        early_checkout_tolerance_minutes: Number(payload.early_checkout_tolerance_minutes || 0),
+        is_active: Boolean(payload.is_active),
+        created_at: rows[index]?.created_at || nowIso(),
+        updated_at: nowIso()
+      };
+      if (index >= 0) rows[index] = next;
+      else rows.push(next);
+      write(KEYS.schedules, rows);
+      return next.id;
+    }
+    const { error } = await supabase.rpc("admin_save_work_schedule", {
+      p_token: token,
+      p_id: payload.id || null,
+      p_shift_name: payload.shift_name,
+      p_check_in_time: payload.check_in_time,
+      p_check_out_time: payload.check_out_time,
+      p_late_tolerance_minutes: Number(payload.late_tolerance_minutes || 0),
+      p_early_checkout_tolerance_minutes: Number(payload.early_checkout_tolerance_minutes || 0),
+      p_is_active: Boolean(payload.is_active)
+    });
+    throwIfError(error);
+  },
+  async listOvertimeAttendance(token, start, end) {
+    requireBackend();
+    if (isDemoMode) {
+      const admin = demoAdmin(token);
+      return read(KEYS.overtime).filter((item) => item.date >= start && item.date <= end && canAccessBagian(admin, item.bagian)).sort((a, b) => b.date.localeCompare(a.date));
+    }
+    const { data, error } = await supabase.rpc("admin_list_overtime_attendance", { p_token: token, p_start: start, p_end: end });
+    throwIfError(error);
+    return data || [];
+  },
+  async listRequestLogs(token, requestId) {
+    requireBackend();
+    if (isDemoMode) {
+      demoAdmin(token);
+      return read(KEYS.requestLogs).filter((item) => item.request_id === requestId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    const { data, error } = await supabase.rpc("admin_list_request_logs", { p_token: token, p_request_id: requestId });
+    throwIfError(error);
+    return data || [];
+  },
+  async listAnnouncements(token) {
+    requireBackend();
+    if (isDemoMode) {
+      requireSuper(demoAdmin(token));
+      return read(KEYS.announcements).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    const { data, error } = await supabase.rpc("admin_list_announcements", { p_token: token });
+    throwIfError(error);
+    return data || [];
+  },
+  async saveAnnouncement(token, payload) {
+    requireBackend();
+    if (isDemoMode) {
+      const admin = demoAdmin(token);
+      requireSuper(admin);
+      const rows = read(KEYS.announcements);
+      const index = rows.findIndex((item) => item.id === payload.id);
+      const next = {
+        id: payload.id || uuid(),
+        title: payload.title,
+        message: payload.message,
+        target_bagian: payload.target_bagian,
+        priority: payload.priority,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        is_active: Boolean(payload.is_active),
+        created_by: rows[index]?.created_by || admin.id,
+        created_at: rows[index]?.created_at || nowIso(),
+        updated_at: nowIso()
+      };
+      if (index >= 0) rows[index] = next;
+      else rows.unshift(next);
+      write(KEYS.announcements, rows);
+      return next.id;
+    }
+    const { error } = await supabase.rpc("admin_save_announcement", {
+      p_token: token,
+      p_id: payload.id || null,
+      p_title: payload.title,
+      p_message: payload.message,
+      p_target_bagian: payload.target_bagian,
+      p_priority: payload.priority,
+      p_start_date: payload.start_date,
+      p_end_date: payload.end_date,
+      p_is_active: Boolean(payload.is_active)
+    });
+    throwIfError(error);
+  },
+  async deleteAnnouncement(token, id) {
+    requireBackend();
+    if (isDemoMode) {
+      requireSuper(demoAdmin(token));
+      write(KEYS.announcements, read(KEYS.announcements).filter((item) => item.id !== id));
+      return;
+    }
+    const { error } = await supabase.rpc("admin_delete_announcement", { p_token: token, p_id: id });
     throwIfError(error);
   },
   async adminGetOfficeLocation(token) {

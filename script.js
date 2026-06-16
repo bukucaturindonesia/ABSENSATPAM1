@@ -1,4 +1,4 @@
-import { api, isConfigured, isDemoMode, REQUEST_LABELS, REQUEST_STATUS_LABELS } from "./supabase.js";
+import { api, isConfigured, isDemoMode, REQUEST_LABELS, REQUEST_STATUS_LABELS, ANNOUNCEMENT_PRIORITY_LABELS } from "./supabase.js";
 
 const EMPLOYEE_SESSION_KEY = "gkn_employee_session_v2";
 const APP_TIME_ZONE = "Asia/Makassar";
@@ -94,7 +94,7 @@ function getLocation() {
     if (!navigator.geolocation) return reject(new Error("GPS tidak didukung browser ini."));
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ latitude: Number(pos.coords.latitude.toFixed(8)), longitude: Number(pos.coords.longitude.toFixed(8)), accuracy: Math.round(pos.coords.accuracy) }),
-      () => reject(new Error("GPS belum aktif. Izinkan akses lokasi lalu coba lagi.")),
+      () => reject(new Error("GPS tidak dapat diambil. Pastikan izin lokasi aktif lalu coba lagi.")),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   });
@@ -150,6 +150,27 @@ function blobToFile(blob, fileName) {
   return new File([blob], fileName, { type: blob.type || "image/jpeg", lastModified: Date.now() });
 }
 
+function distanceMeters(aLat, aLng, bLat, bLng) {
+  const R = 6371000;
+  const toRad = (value) => value * Math.PI / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)));
+}
+
+function locationSummary(position, office) {
+  if (!position || !office) return { label: "Lokasi tersimpan", detail: "Data GPS berhasil disimpan.", inRadius: true };
+  const distance = distanceMeters(Number(office.latitude), Number(office.longitude), Number(position.latitude), Number(position.longitude));
+  const radius = Number(office.radius_meter || 0);
+  const inRadius = distance <= radius;
+  return {
+    label: inRadius ? "Lokasi dalam radius" : "Lokasi luar radius",
+    detail: `${office.nama_lokasi || "Lokasi kantor"} - jarak sekitar ${distance} m dari radius ${radius} m.`,
+    inRadius
+  };
+}
+
 function initHome() { preserveDemoNavigation(); }
 
 function initEmployeeLogin() {
@@ -181,13 +202,20 @@ async function initEmployeeDashboard() {
   if (!session?.employee?.id || !session?.pin) return location.replace(withDemo("login.html"));
   let employee = session.employee;
   let todayAttendance = null;
-  // State selfie masuk/pulang dipisah supaya validasi absen tidak lagi memakai input file.
+  let officeLocation = null;
+  let workSchedule = null;
+  let approvedOvertimeRequests = [];
+  let todayOvertime = null;
+  // State selfie masuk/pulang/lembur dipisah supaya validasi absen tidak lagi memakai input file.
   let checkInCameraStream = null;
   let checkOutCameraStream = null;
+  let overtimeCameraStream = null;
   let capturedCheckInBlob = null;
   let capturedCheckOutBlob = null;
+  let capturedOvertimeBlob = null;
   let checkInPreviewUrl = "";
   let checkOutPreviewUrl = "";
+  let overtimePreviewUrl = "";
 
   const checkInCamera = {
     label: "masuk",
@@ -221,14 +249,36 @@ async function initEmployeeDashboard() {
     get previewUrl() { return checkOutPreviewUrl; },
     set previewUrl(value) { checkOutPreviewUrl = value; }
   };
+  const overtimeCamera = {
+    label: "lembur",
+    video: $("#overtimeVideo"),
+    canvas: $("#overtimeCanvas"),
+    preview: $("#overtimePreview"),
+    placeholder: $("#overtimeCameraPlaceholder"),
+    openButton: $("#openOvertimeCamera"),
+    captureButton: $("#captureOvertimePhoto"),
+    retakeButton: $("#retakeOvertimePhoto"),
+    get stream() { return overtimeCameraStream; },
+    set stream(value) { overtimeCameraStream = value; },
+    get blob() { return capturedOvertimeBlob; },
+    set blob(value) { capturedOvertimeBlob = value; },
+    get previewUrl() { return overtimePreviewUrl; },
+    set previewUrl(value) { overtimePreviewUrl = value; }
+  };
+
+  function canUseOvertimeCamera() {
+    return approvedOvertimeRequests.length > 0 && (!todayOvertime || todayOvertime.status === "berjalan");
+  }
 
   function isCameraBlocked(controller) {
     if (controller.label === "masuk") return Boolean(todayAttendance?.check_in_time);
+    if (controller.label === "lembur") return !canUseOvertimeCamera();
     return !todayAttendance?.check_in_time || Boolean(todayAttendance?.check_out_time);
   }
 
   function cameraBlockedMessage(controller) {
     if (controller.label === "pulang" && !todayAttendance?.check_in_time) return "Lakukan absen masuk terlebih dahulu.";
+    if (controller.label === "lembur") return "Absen lembur hanya dapat dilakukan setelah pengajuan lembur disetujui admin.";
     return "Absensi hari ini sudah tercatat.";
   }
 
@@ -304,11 +354,35 @@ async function initEmployeeDashboard() {
   function stopAllCameras() {
     stopCameraController(checkInCamera);
     stopCameraController(checkOutCamera);
+    stopCameraController(overtimeCamera);
+  }
+
+  function renderResult(target, title, detail, ok = true) {
+    if (!target) return;
+    target.className = `result-strip ${ok ? "result-success" : "result-warning"}`;
+    target.innerHTML = `<strong>${esc(title)}</strong><span>${esc(detail)}</span>`;
+  }
+
+  function renderOvertime() {
+    const hasApproved = approvedOvertimeRequests.length > 0;
+    const isRunning = todayOvertime?.status === "berjalan";
+    const isFinished = todayOvertime?.status === "selesai";
+    $("#overtimeAccessNotice").classList.toggle("hidden", hasApproved);
+    $("#overtimeRequestSelect").innerHTML = hasApproved
+      ? approvedOvertimeRequests.map((item) => `<option value="${esc(item.id)}">${esc(formatDate(item.tanggal_mulai))} - ${esc(item.alasan)}</option>`).join("")
+      : `<option value="">Belum ada pengajuan lembur disetujui</option>`;
+    $("#overtimeStatusBadge").className = `status-badge ${isFinished ? "status-present" : isRunning ? "status-late" : hasApproved ? "status-present" : "status-neutral"}`;
+    $("#overtimeStatusBadge").textContent = isFinished ? "Selesai" : isRunning ? "Berjalan" : hasApproved ? "Siap Lembur" : "Belum Aktif";
+    $("#startOvertimeButton").disabled = !hasApproved || isRunning || isFinished;
+    $("#finishOvertimeButton").disabled = !isRunning;
+    $("#overtimeRequestSelect").disabled = !hasApproved || isRunning || isFinished;
+    renderCamera(overtimeCamera);
   }
 
   function renderProfile() {
     $("#welcomeName").textContent = `Halo, ${employee.name}`;
     $("#employeeMeta").textContent = `${employee.bagian} - Shift ${employee.shift || "-"}`;
+    $("#employeeScheduleMeta").textContent = workSchedule ? `Jam kerja: ${String(workSchedule.check_in_time).slice(0, 5)} - ${String(workSchedule.check_out_time).slice(0, 5)}` : "Jam kerja: memuat...";
     $("#employeeBio").value = employee.bio || "";
     $("#profilePhoto").src = employee.photo_url || `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="24" fill="#e8f4fb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="38" fill="#1479b8">${employee.name.slice(0,1).toUpperCase()}</text></svg>`)}`;
   }
@@ -322,10 +396,40 @@ async function initEmployeeDashboard() {
     $("#checkOutButton").disabled = !todayAttendance?.check_in_time || Boolean(todayAttendance?.check_out_time);
     renderCamera(checkInCamera);
     renderCamera(checkOutCamera);
+    renderOvertime();
+    $("#summaryLocationRadius").textContent = officeLocation?.radius_meter ? `${officeLocation.radius_meter} m` : "-";
   }
   async function loadToday() {
     todayAttendance = await api.getDailyAttendance(employee.id, session.pin, localDateKey());
     renderToday();
+  }
+  async function loadSchedule() {
+    workSchedule = await api.getWorkScheduleByShift(employee.shift || "Reguler");
+    renderProfile();
+  }
+  async function loadOvertime() {
+    approvedOvertimeRequests = await api.listApprovedOvertimeRequests(employee.id, session.pin);
+    todayOvertime = await api.getTodayOvertime(employee.id, session.pin, localDateKey());
+    renderOvertime();
+  }
+  async function loadAnnouncements() {
+    const rows = await api.listEmployeeAnnouncements(employee.id, session.pin);
+    const unread = rows.filter((row) => !row.read_at).length;
+    $("#announcementBadge").classList.toggle("hidden", unread === 0);
+    $("#announcementEmpty").classList.toggle("hidden", rows.length > 0);
+    $("#announcementList").innerHTML = rows.map((row) => `
+      <article class="announcement-card announcement-${esc(row.priority)}">
+        <div>
+          <span class="status-badge ${row.priority === "darurat" ? "status-inactive" : row.priority === "penting" ? "status-late" : "status-neutral"}">${esc(ANNOUNCEMENT_PRIORITY_LABELS[row.priority] || row.priority)}</span>
+          ${row.read_at ? "" : `<span class="status-badge status-present">Pesan Baru</span>`}
+        </div>
+        <h3>${esc(row.title)}</h3>
+        <p>${esc(row.message)}</p>
+        <small>Berlaku ${esc(formatDate(row.start_date))} s.d. ${esc(formatDate(row.end_date))}</small>
+        ${row.read_at ? `<small>Sudah dibaca ${esc(formatDate(row.read_at))}</small>` : `<button class="button button-secondary button-small" type="button" data-read-announcement="${esc(row.id)}">Saya sudah membaca</button>`}
+      </article>
+    `).join("");
+    icons();
   }
   async function loadHistory() {
     const rows = await api.listEmployeeAttendance(employee.id, session.pin);
@@ -358,11 +462,12 @@ async function initEmployeeDashboard() {
   }
   async function loadOffice() {
     try {
-      const office = await api.getOfficeLocation();
-      $("#officeLocationInfo").innerHTML = `<i data-lucide="map-pin"></i><p>Lokasi default: <strong>${esc(office?.nama_lokasi || "-")}</strong>, radius <strong>${esc(office?.radius_meter || "-")} meter</strong>. Jika di luar radius, sistem memberi peringatan dan lokasi tetap disimpan.</p>`;
+      officeLocation = await api.getOfficeLocation();
+      $("#officeLocationInfo").innerHTML = `Lokasi default: <strong>${esc(officeLocation?.nama_lokasi || "-")}</strong>, radius <strong>${esc(officeLocation?.radius_meter || "-")} meter</strong>. Jika di luar radius, sistem memberi peringatan dan lokasi tetap disimpan.`;
+      $("#summaryLocationRadius").textContent = officeLocation?.radius_meter ? `${officeLocation.radius_meter} m` : "-";
       icons();
     } catch {
-      $("#officeLocationInfo").innerHTML = `<i data-lucide="map-pin"></i><p>Lokasi default belum tersedia.</p>`;
+      $("#officeLocationInfo").textContent = "Lokasi default belum tersedia.";
     }
   }
 
@@ -370,9 +475,17 @@ async function initEmployeeDashboard() {
   setInterval(() => {
     $("#liveClock").textContent = new Intl.DateTimeFormat("id-ID", { timeZone: APP_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date()).replaceAll(".", ":");
   }, 1000);
-  $("#todayTitle").textContent = formatDate(localDateKey(), { month: "long" });
+  if ($("#todayTitle")) $("#todayTitle").textContent = formatDate(localDateKey(), { month: "long" });
   $("#requestStart").value = localDateKey();
   $("#requestEnd").value = localDateKey();
+
+  $$("[data-employee-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = button.dataset.employeeTab;
+      $$("[data-employee-tab]").forEach((item) => item.classList.toggle("active", item === button));
+      $$(".employee-tab-panel").forEach((panel) => panel.classList.toggle("hidden", panel.id !== target));
+    });
+  });
 
   $("#employeeLogout").addEventListener("click", () => {
     stopAllCameras();
@@ -385,18 +498,34 @@ async function initEmployeeDashboard() {
   checkOutCamera.openButton.addEventListener("click", () => openCamera(checkOutCamera));
   checkOutCamera.captureButton.addEventListener("click", () => captureCamera(checkOutCamera));
   checkOutCamera.retakeButton.addEventListener("click", () => openCamera(checkOutCamera));
+  overtimeCamera.openButton.addEventListener("click", () => openCamera(overtimeCamera));
+  overtimeCamera.captureButton.addEventListener("click", () => captureCamera(overtimeCamera));
+  overtimeCamera.retakeButton.addEventListener("click", () => openCamera(overtimeCamera));
+  $("#announcementList").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-read-announcement]");
+    if (!button) return;
+    try {
+      await api.markAnnouncementRead(employee.id, session.pin, button.dataset.readAnnouncement);
+      await loadAnnouncements();
+      showToast("Pemberitahuan ditandai dibaca");
+    } catch (error) {
+      showToast("Gagal menandai pesan", errorMessage(error), "error");
+    }
+  });
   window.addEventListener("beforeunload", stopAllCameras);
   $("#checkInForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const button = $("#checkInButton");
-    if (!capturedCheckInBlob) return showToast("Selfie wajib", "Ambil foto selfie masuk terlebih dahulu.", "error");
+    if (!capturedCheckInBlob) return showToast("Selfie wajib", "Ambil foto selfie terlebih dahulu.", "error");
     setLoading(button, true, "Mengambil GPS...");
     try {
       const position = await getLocation();
-      setLoading(button, true, "Mengirim absen...");
+      const summary = locationSummary(position, officeLocation);
+      setLoading(button, true, "Mengupload selfie...");
       const selfieFile = blobToFile(capturedCheckInBlob, `check-in-${localDateKey()}-${Date.now()}.jpg`);
       const selfieUrl = await api.uploadSelfie(selfieFile, employee.id, "masuk");
+      setLoading(button, true, "Menyimpan absensi...");
       todayAttendance = await api.checkIn({
         guardId: employee.id,
         pin: session.pin,
@@ -411,7 +540,8 @@ async function initEmployeeDashboard() {
       resetCamera(checkInCamera);
       renderToday();
       await loadHistory();
-      showToast("Absen masuk berhasil", todayAttendance.check_in_note || `Akurasi GPS sekitar ${position.accuracy} m.`);
+      renderResult($("#checkInLocationResult"), `Jam masuk ${formatTime(todayAttendance.check_in_time)} WITA - ${todayAttendance.status}`, `${summary.label}. Foto berhasil tersimpan. ${summary.detail}`, summary.inRadius);
+      showToast("Absen masuk berhasil", `${summary.label}. Foto berhasil tersimpan.`);
     } catch (error) {
       showToast("Absen masuk gagal", errorMessage(error), "error");
     } finally {
@@ -423,13 +553,15 @@ async function initEmployeeDashboard() {
     event.preventDefault();
     const form = event.currentTarget;
     const button = $("#checkOutButton");
-    if (!capturedCheckOutBlob) return showToast("Selfie wajib", "Ambil foto selfie pulang terlebih dahulu.", "error");
+    if (!capturedCheckOutBlob) return showToast("Selfie wajib", "Ambil foto selfie terlebih dahulu.", "error");
     setLoading(button, true, "Mengambil GPS...");
     try {
       const position = await getLocation();
-      setLoading(button, true, "Mengirim absen...");
+      const summary = locationSummary(position, officeLocation);
+      setLoading(button, true, "Mengupload selfie...");
       const selfieFile = blobToFile(capturedCheckOutBlob, `check-out-${localDateKey()}-${Date.now()}.jpg`);
       const selfieUrl = await api.uploadSelfie(selfieFile, employee.id, "pulang");
+      setLoading(button, true, "Menyimpan absensi...");
       todayAttendance = await api.checkOut({
         guardId: employee.id,
         pin: session.pin,
@@ -438,15 +570,14 @@ async function initEmployeeDashboard() {
         latitude: position.latitude,
         longitude: position.longitude,
         selfieUrl,
-        note: $("#checkOutNote").value.trim(),
-        isOvertime: $("#isOvertime").checked,
-        overtimeNote: $("#overtimeNote").value.trim()
+        note: $("#checkOutNote").value.trim()
       });
       form.reset();
       resetCamera(checkOutCamera);
       renderToday();
       await loadHistory();
-      showToast("Absen pulang berhasil", todayAttendance.check_out_note || `Status: ${todayAttendance.status}.`);
+      renderResult($("#checkOutLocationResult"), `Jam pulang ${formatTime(todayAttendance.check_out_time)} WITA - ${todayAttendance.status}`, `${summary.label}. Foto berhasil tersimpan. ${summary.detail}`, summary.inRadius);
+      showToast("Absen pulang berhasil", `${summary.label}. Foto berhasil tersimpan.`);
     } catch (error) {
       showToast("Absen pulang gagal", errorMessage(error), "error");
     } finally {
@@ -454,6 +585,61 @@ async function initEmployeeDashboard() {
       renderToday();
     }
   });
+  async function submitOvertime(action) {
+    const button = action === "start" ? $("#startOvertimeButton") : $("#finishOvertimeButton");
+    if (!approvedOvertimeRequests.length) return showToast("Lembur belum tersedia", "Absen lembur hanya dapat dilakukan setelah pengajuan lembur disetujui admin.", "error");
+    if (!capturedOvertimeBlob) return showToast("Selfie wajib", "Ambil foto selfie terlebih dahulu.", "error");
+    const note = $("#overtimeNote").value.trim();
+    if (!note) return showToast("Keterangan wajib", "Keterangan lembur wajib diisi.", "error");
+    if (action === "finish" && todayOvertime?.status !== "berjalan") return showToast("Lembur belum berjalan", "Mulai lembur terlebih dahulu.", "error");
+    setLoading(button, true, "Mengambil GPS...");
+    try {
+      const position = await getLocation();
+      const summary = locationSummary(position, officeLocation);
+      setLoading(button, true, "Mengupload selfie...");
+      const selfieFile = blobToFile(capturedOvertimeBlob, `overtime-${action}-${localDateKey()}-${Date.now()}.jpg`);
+      const selfieUrl = await api.uploadSelfie(selfieFile, employee.id, `lembur-${action}`);
+      setLoading(button, true, "Menyimpan absensi...");
+      if (action === "start") {
+        todayOvertime = await api.startOvertime({
+          guardId: employee.id,
+          pin: session.pin,
+          requestId: $("#overtimeRequestSelect").value,
+          date: localDateKey(),
+          time: new Date().toISOString(),
+          latitude: position.latitude,
+          longitude: position.longitude,
+          selfieUrl,
+          note
+        });
+        renderResult($("#overtimeResult"), `Mulai lembur ${formatTime(todayOvertime.overtime_start_time)} WITA`, `${summary.label}. Foto berhasil tersimpan. ${summary.detail}`, summary.inRadius);
+        showToast("Lembur dimulai", `${summary.label}.`);
+      } else {
+        todayOvertime = await api.finishOvertime({
+          guardId: employee.id,
+          pin: session.pin,
+          overtimeId: todayOvertime.id,
+          time: new Date().toISOString(),
+          latitude: position.latitude,
+          longitude: position.longitude,
+          selfieUrl,
+          note
+        });
+        renderResult($("#overtimeResult"), `Selesai lembur ${formatTime(todayOvertime.overtime_end_time)} WITA`, `${todayOvertime.overtime_duration || "Durasi tersimpan"}. Foto berhasil tersimpan. ${summary.detail}`, summary.inRadius);
+        showToast("Lembur selesai", todayOvertime.overtime_duration || "Durasi lembur tersimpan.");
+      }
+      resetCamera(overtimeCamera);
+      $("#overtimeNote").value = "";
+      await loadOvertime();
+    } catch (error) {
+      showToast("Absen lembur gagal", errorMessage(error), "error");
+    } finally {
+      setLoading(button, false);
+      renderOvertime();
+    }
+  }
+  $("#startOvertimeButton").addEventListener("click", () => submitOvertime("start"));
+  $("#finishOvertimeButton").addEventListener("click", () => submitOvertime("finish"));
   $("#requestForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -511,7 +697,7 @@ async function initEmployeeDashboard() {
   $("#refreshRequests").addEventListener("click", loadRequests);
 
   renderProfile();
-  await Promise.all([loadToday(), loadHistory(), loadRequests(), loadOffice()]);
+  await Promise.all([loadSchedule(), loadToday(), loadHistory(), loadRequests(), loadOffice(), loadOvertime(), loadAnnouncements()]);
   icons();
 }
 

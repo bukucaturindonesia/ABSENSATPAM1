@@ -10,13 +10,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-page="admin">
+<body data-page="admin" class="theme-kemenkeu">
+  <span class="logo-watermark" aria-hidden="true"></span>
   <main id="adminLoginView" class="auth-shell">
     <section class="auth-card">
       <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i> Kembali</a>
       <div class="brand auth-brand">
-        <span class="brand-mark"><i data-lucide="building-2"></i></span>
-        <span><strong>ABSENSI GKN</strong><small>Login Admin</small></span>
+        <span class="brand-mark"><img class="brand-logo official-logo" src="assets/logo-kemenkeu.png" alt="Logo Kemenkeu" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');"><i class="hidden" data-lucide="building-2"></i></span>
+        <span><strong>ABSENSI GKN MAMUJU</strong><small>Login Admin</small></span>
       </div>
       <div class="auth-heading">
         <h1>Login Admin</h1>
@@ -34,7 +35,7 @@
   <div id="adminDashboard" class="admin-layout hidden">
     <aside class="admin-sidebar">
       <div class="brand sidebar-brand">
-        <span class="brand-mark"><i data-lucide="building-2"></i></span>
+        <span class="brand-mark"><img class="brand-logo official-logo" src="assets/logo-kemenkeu.png" alt="Logo Kemenkeu" onerror="this.classList.add('hidden');this.nextElementSibling.classList.remove('hidden');"><i class="hidden" data-lucide="building-2"></i></span>
         <span><strong>ABSENSI GKN</strong><small>Mamuju</small></span>
       </div>
       <nav class="sidebar-nav">
@@ -48,8 +49,11 @@
         <button class="nav-item" data-view="lemburView" data-title="Pengajuan Lembur"><i data-lucide="moon-star"></i><span>Pengajuan Lembur</span></button>
         <button class="nav-item" data-view="dailyReportView" data-title="Laporan Harian"><i data-lucide="calendar-days"></i><span>Laporan Harian</span></button>
         <button class="nav-item" data-view="monthlyReportView" data-title="Laporan Bulanan"><i data-lucide="chart-no-axes-combined"></i><span>Laporan Bulanan</span></button>
+        <button class="nav-item" data-view="overtimeReportView" data-title="Laporan Lembur"><i data-lucide="moon"></i><span>Laporan Lembur</span></button>
         <button class="nav-item" data-view="exportView" data-title="Export Excel" data-roles="super_admin,admin_umum"><i data-lucide="sheet"></i><span>Export Excel</span></button>
         <button class="nav-item" data-view="locationView" data-title="Pengaturan Lokasi" data-roles="super_admin"><i data-lucide="map-pin"></i><span>Pengaturan Lokasi</span></button>
+        <button class="nav-item" data-view="schedulesView" data-title="Pengaturan Shift / Jam Kerja" data-roles="super_admin"><i data-lucide="calendar-clock"></i><span>Pengaturan Shift</span></button>
+        <button class="nav-item" data-view="announcementsView" data-title="Pemberitahuan" data-roles="super_admin"><i data-lucide="megaphone"></i><span>Pemberitahuan</span></button>
         <button class="nav-item" data-view="adminsView" data-title="Manajemen Admin" data-roles="super_admin"><i data-lucide="shield-check"></i><span>Manajemen Admin</span></button>
       </nav>
       <div class="sidebar-footer">
@@ -59,7 +63,7 @@
     </aside>
 
     <div class="admin-main">
-      <header class="admin-topbar">
+      <header class="admin-topbar official-header">
         <button id="sidebarToggle" class="icon-button mobile-menu-button" type="button"><i data-lucide="menu"></i></button>
         <div><span class="eyebrow">Dashboard Admin</span><h1 id="adminPageTitle">Dashboard</h1></div>
         <div class="topbar-date"><i data-lucide="calendar-days"></i><span id="adminToday">-</span></div>
@@ -90,6 +94,7 @@
         <section id="historyView" class="admin-view hidden report-view" data-mode="history"></section>
         <section id="dailyReportView" class="admin-view hidden report-view" data-mode="daily"></section>
         <section id="monthlyReportView" class="admin-view hidden report-view" data-mode="monthly"></section>
+        <section id="overtimeReportView" class="admin-view hidden"></section>
 
         <section id="izinView" class="admin-view hidden request-view" data-kind="izin"></section>
         <section id="sakitView" class="admin-view hidden request-view" data-kind="sakit"></section>
@@ -111,6 +116,33 @@
             <div class="form-row"><label class="field"><span>Latitude</span><input id="officeLatitude" type="number" step="0.00000001" required></label><label class="field"><span>Longitude</span><input id="officeLongitude" type="number" step="0.00000001" required></label><label class="field"><span>Radius meter</span><input id="officeRadius" type="number" min="10" required></label></div>
             <button class="button button-primary" type="submit"><i data-lucide="save"></i><span>Simpan Lokasi</span></button>
           </form>
+        </section>
+
+        <section id="schedulesView" class="admin-view hidden">
+          <section class="data-section">
+            <div class="table-meta"><div><h2>Pengaturan Shift / Jam Kerja</h2><p>Hanya Super Admin yang dapat mengubah jadwal dan toleransi.</p></div><button id="refreshSchedules" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+            <div id="scheduleList" class="schedule-grid"></div>
+          </section>
+        </section>
+
+        <section id="announcementsView" class="admin-view hidden">
+          <section class="grid-2">
+            <form id="announcementForm" class="data-section form-stack">
+              <input id="announcementEditId" type="hidden">
+              <div class="table-meta no-pad"><div><h2>Pemberitahuan</h2><p>Kirim pesan kepada semua pegawai atau bagian tertentu.</p></div></div>
+              <label class="field"><span>Judul pesan</span><input id="announcementTitle" required></label>
+              <label class="field"><span>Isi pesan</span><textarea id="announcementMessage" rows="4" required></textarea></label>
+              <div class="form-row"><label class="field"><span>Target bagian</span><select id="announcementTarget"></select></label><label class="field"><span>Prioritas</span><select id="announcementPriority"><option value="normal">Normal</option><option value="penting">Penting</option><option value="darurat">Darurat</option></select></label></div>
+              <div class="form-row"><label class="field"><span>Mulai tampil</span><input id="announcementStart" type="date" required></label><label class="field"><span>Selesai tampil</span><input id="announcementEnd" type="date" required></label></div>
+              <label class="toggle-row"><span><strong>Aktif</strong><small>Pemberitahuan tampil sesuai tanggal.</small></span><input id="announcementActive" type="checkbox" checked><span class="toggle-control"></span></label>
+              <div class="horizontal-actions"><button id="cancelAnnouncementEdit" class="button button-secondary hidden" type="button">Batal Edit</button><button class="button button-primary" type="submit"><i data-lucide="send"></i><span>Simpan Pemberitahuan</span></button></div>
+            </form>
+            <section class="data-section">
+              <div class="table-meta"><div><h2>Daftar Pemberitahuan</h2><p>Kelola pesan aktif/nonaktif.</p></div><button id="refreshAnnouncements" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+              <div id="announcementsAdminList" class="announcement-list"></div>
+              <div id="announcementsAdminEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada pemberitahuan</strong></div>
+            </section>
+          </section>
         </section>
 
         <section id="adminsView" class="admin-view hidden">
