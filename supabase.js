@@ -1,7 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-export const SUPABASE_URL = "YOUR_SUPABASE_URL";
-export const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+export const SUPABASE_URL = "https://hobhrpcljwvwphqjlkjs.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_tJw31G8C3JHDMB4fck9UCA_rnVTSmGQ";
 export const SELFIE_BUCKET = "attendance-selfies";
 export const PROFILE_BUCKET = "profile-photos";
 export const REQUEST_BUCKET = "request-proofs";
