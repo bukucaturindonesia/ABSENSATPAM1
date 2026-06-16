@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f2a43">
+  <title>Login Pegawai - ABSENSI GKN MAMUJU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="employee-login">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i> Kembali</a>
+      <div class="brand auth-brand">
+        <span class="brand-mark"><i data-lucide="building-2"></i></span>
+        <span><strong>ABSENSI GKN</strong><small>Login Pegawai</small></span>
+      </div>
+      <div class="auth-heading">
+        <h1>Selamat bertugas</h1>
+        <p>Masukkan nama dan PIN pegawai yang aktif.</p>
+      </div>
+      <div id="configNotice" class="notice notice-warning hidden"><i data-lucide="triangle-alert"></i><span>Supabase belum dikonfigurasi. Isi <strong>supabase.js</strong> atau buka dengan <strong>?demo=1</strong>.</span></div>
+      <form id="employeeLoginForm" class="form-stack">
+        <label class="field">
+          <span>Nama pegawai</span>
+          <span class="input-wrap"><i data-lucide="user"></i><input id="employeeName" type="text" autocomplete="name" placeholder="Contoh: Abdul Haris" required></span>
+        </label>
+        <label class="field">
+          <span>PIN</span>
+          <span class="input-wrap">
+            <i data-lucide="key-round"></i>
+            <input id="employeePin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="20" placeholder="Masukkan PIN" required>
+            <button class="icon-button password-toggle" type="button" aria-label="Tampilkan PIN"><i data-lucide="eye"></i></button>
+          </span>
+        </label>
+        <button class="button button-primary button-block button-large" type="submit"><i data-lucide="log-in"></i><span>Masuk</span></button>
+      </form>
+      <p class="auth-help"><i data-lucide="circle-help"></i> Pegawai nonaktif tidak dapat login.</p>
+    </section>
+  </main>
+  <div id="toastRegion" class="toast-region"></div>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>

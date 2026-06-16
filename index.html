@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f2a43">
+  <title>ABSENSI GKN MAMUJU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="home">
+  <main class="access-shell">
+    <section class="access-panel">
+      <div class="brand brand-large">
+        <span class="brand-mark"><i data-lucide="building-2"></i></span>
+        <span><strong>ABSENSI GKN</strong><small>Mamuju</small></span>
+      </div>
+
+      <div class="access-intro">
+        <span class="eyebrow">Sistem Kehadiran Pegawai</span>
+        <h1>ABSENSI GKN MAMUJU</h1>
+        <p>Absen masuk, absen pulang, GPS, selfie, pengajuan izin, sakit, cuti, lembur, dan laporan pegawai dalam satu aplikasi.</p>
+      </div>
+
+      <div class="role-grid">
+        <a class="role-option role-guard" href="login.html">
+          <span class="role-icon"><i data-lucide="scan-face"></i></span>
+          <span class="role-copy"><strong>Login Pegawai</strong><small>Absensi, profil, dan pengajuan</small></span>
+          <i data-lucide="arrow-right" class="role-arrow"></i>
+        </a>
+        <a class="role-option role-admin" href="admin.html">
+          <span class="role-icon"><i data-lucide="layout-dashboard"></i></span>
+          <span class="role-copy"><strong>Login Admin</strong><small>Dashboard sesuai role dan bagian</small></span>
+          <i data-lucide="arrow-right" class="role-arrow"></i>
+        </a>
+      </div>
+
+      <div class="system-note">
+        <i data-lucide="shield-check"></i>
+        <span>Admin memakai username dan password/PIN dari tabel <strong>admin_users</strong>, bukan Supabase Auth email.</span>
+      </div>
+    </section>
+
+    <aside class="access-visual">
+      <div class="visual-topbar"><span class="live-dot"></span>Sistem aktif</div>
+      <div class="visual-content">
+        <span class="visual-icon"><i data-lucide="map-pin-check"></i></span>
+        <p>Data waktu, lokasi, selfie, dan status pengajuan tersimpan sebagai bukti kehadiran.</p>
+        <div class="visual-metrics">
+          <div><strong>5</strong><span>Bagian</span></div>
+          <div><strong>GPS</strong><span>Radius</span></div>
+          <div><strong>Excel</strong><span>Export</span></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>

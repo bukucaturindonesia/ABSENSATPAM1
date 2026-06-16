@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f2a43">
+  <title>Admin - ABSENSI GKN MAMUJU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="admin">
+  <main id="adminLoginView" class="auth-shell">
+    <section class="auth-card">
+      <a class="back-link" href="index.html"><i data-lucide="arrow-left"></i> Kembali</a>
+      <div class="brand auth-brand">
+        <span class="brand-mark"><i data-lucide="building-2"></i></span>
+        <span><strong>ABSENSI GKN</strong><small>Login Admin</small></span>
+      </div>
+      <div class="auth-heading">
+        <h1>Login Admin</h1>
+        <p>Gunakan username dan password/PIN dari tabel admin_users.</p>
+      </div>
+      <div id="configNotice" class="notice notice-warning hidden"><i data-lucide="triangle-alert"></i><span>Supabase belum dikonfigurasi. Isi <strong>supabase.js</strong> atau buka dengan <strong>?demo=1</strong>.</span></div>
+      <form id="adminLoginForm" class="form-stack">
+        <label class="field"><span>Username</span><span class="input-wrap"><i data-lucide="user"></i><input id="adminUsername" type="text" autocomplete="username" required></span></label>
+        <label class="field"><span>Password / PIN</span><span class="input-wrap"><i data-lucide="lock-keyhole"></i><input id="adminPassword" type="password" autocomplete="current-password" required><button class="icon-button password-toggle" type="button"><i data-lucide="eye"></i></button></span></label>
+        <button class="button button-primary button-block button-large" type="submit"><i data-lucide="log-in"></i><span>Masuk Dashboard</span></button>
+      </form>
+    </section>
+  </main>
+
+  <div id="adminDashboard" class="admin-layout hidden">
+    <aside class="admin-sidebar">
+      <div class="brand sidebar-brand">
+        <span class="brand-mark"><i data-lucide="building-2"></i></span>
+        <span><strong>ABSENSI GKN</strong><small>Mamuju</small></span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="dashboardView" data-title="Dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
+        <button class="nav-item" data-view="employeesView" data-title="Data Pegawai"><i data-lucide="users"></i><span>Data Pegawai</span></button>
+        <button class="nav-item" data-view="todayView" data-title="Absensi Hari Ini"><i data-lucide="clipboard-check"></i><span>Absensi Hari Ini</span></button>
+        <button class="nav-item" data-view="historyView" data-title="Riwayat Absensi"><i data-lucide="history"></i><span>Riwayat Absensi</span></button>
+        <button class="nav-item" data-view="izinView" data-title="Pengajuan Izin"><i data-lucide="file-clock"></i><span>Pengajuan Izin</span></button>
+        <button class="nav-item" data-view="sakitView" data-title="Pengajuan Sakit"><i data-lucide="heart-pulse"></i><span>Pengajuan Sakit</span></button>
+        <button class="nav-item" data-view="cutiView" data-title="Pengajuan Cuti"><i data-lucide="calendar-range"></i><span>Pengajuan Cuti</span></button>
+        <button class="nav-item" data-view="lemburView" data-title="Pengajuan Lembur"><i data-lucide="moon-star"></i><span>Pengajuan Lembur</span></button>
+        <button class="nav-item" data-view="dailyReportView" data-title="Laporan Harian"><i data-lucide="calendar-days"></i><span>Laporan Harian</span></button>
+        <button class="nav-item" data-view="monthlyReportView" data-title="Laporan Bulanan"><i data-lucide="chart-no-axes-combined"></i><span>Laporan Bulanan</span></button>
+        <button class="nav-item" data-view="exportView" data-title="Export Excel" data-roles="super_admin,admin_umum"><i data-lucide="sheet"></i><span>Export Excel</span></button>
+        <button class="nav-item" data-view="locationView" data-title="Pengaturan Lokasi" data-roles="super_admin"><i data-lucide="map-pin"></i><span>Pengaturan Lokasi</span></button>
+        <button class="nav-item" data-view="adminsView" data-title="Manajemen Admin" data-roles="super_admin"><i data-lucide="shield-check"></i><span>Manajemen Admin</span></button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="admin-identity"><span class="avatar"><i data-lucide="user-round"></i></span><div><strong id="adminNameLabel">Admin</strong><small id="adminRoleLabel">-</small></div></div>
+        <button id="adminLogout" class="nav-item logout-item" type="button"><i data-lucide="log-out"></i><span>Keluar</span></button>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <button id="sidebarToggle" class="icon-button mobile-menu-button" type="button"><i data-lucide="menu"></i></button>
+        <div><span class="eyebrow">Dashboard Admin</span><h1 id="adminPageTitle">Dashboard</h1></div>
+        <div class="topbar-date"><i data-lucide="calendar-days"></i><span id="adminToday">-</span></div>
+      </header>
+
+      <main class="admin-content">
+        <div id="accessDenied" class="notice notice-danger hidden"><i data-lucide="shield-x"></i><span>Anda tidak memiliki akses</span></div>
+
+        <section id="dashboardView" class="admin-view">
+          <div class="welcome-admin-card"><div><span class="eyebrow">Ringkasan akses</span><h2 id="welcomeAdmin">Selamat datang</h2><p id="adminScope">Memuat hak akses...</p></div><span id="adminRoleBadge" class="status-badge status-present">Admin</span></div>
+          <div class="stats-grid">
+            <article class="stat-card"><span class="stat-icon stat-blue"><i data-lucide="users"></i></span><div><span>Pegawai Aktif</span><strong id="statEmployees">0</strong></div></article>
+            <article class="stat-card"><span class="stat-icon stat-green"><i data-lucide="circle-check-big"></i></span><div><span>Hadir Hari Ini</span><strong id="statPresent">0</strong></div></article>
+            <article class="stat-card"><span class="stat-icon stat-amber"><i data-lucide="clock-alert"></i></span><div><span>Pengajuan Pending</span><strong id="statPending">0</strong></div></article>
+            <article class="stat-card"><span class="stat-icon stat-gray"><i data-lucide="map-pin"></i></span><div><span>Radius Lokasi</span><strong id="statRadius">-</strong></div></article>
+          </div>
+        </section>
+
+        <section id="employeesView" class="admin-view hidden">
+          <section class="data-section">
+            <div class="table-meta"><div><h2>Data Pegawai</h2><p id="employeeScopeText">Sesuai hak akses admin.</p></div><button id="addEmployeeButton" class="button button-primary" data-roles="super_admin"><i data-lucide="user-plus"></i><span>Tambah Pegawai</span></button></div>
+            <div class="filters-grid"><label class="field"><span>Cari</span><input id="employeeSearch" type="search"></label><label class="field"><span>Bagian</span><select id="employeeBagianFilter" data-section-filter><option value="">Semua</option></select></label><label class="field"><span>Status</span><select id="employeeStatusFilter"><option value="">Semua</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></label></div>
+            <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Bagian</th><th>Shift</th><th>Telepon</th><th>Profil</th><th>Status</th><th class="align-right">Aksi</th></tr></thead><tbody id="employeesBody"></tbody></table><div id="employeesEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Data tidak ditemukan</strong></div></div>
+          </section>
+        </section>
+
+        <section id="todayView" class="admin-view hidden report-view" data-mode="today"></section>
+        <section id="historyView" class="admin-view hidden report-view" data-mode="history"></section>
+        <section id="dailyReportView" class="admin-view hidden report-view" data-mode="daily"></section>
+        <section id="monthlyReportView" class="admin-view hidden report-view" data-mode="monthly"></section>
+
+        <section id="izinView" class="admin-view hidden request-view" data-kind="izin"></section>
+        <section id="sakitView" class="admin-view hidden request-view" data-kind="sakit"></section>
+        <section id="cutiView" class="admin-view hidden request-view" data-kind="cuti"></section>
+        <section id="lemburView" class="admin-view hidden request-view" data-kind="lembur"></section>
+
+        <section id="exportView" class="admin-view hidden">
+          <section class="data-section">
+            <div class="table-meta"><div><h2>Export Excel / CSV</h2><p>Data export tetap dibatasi sesuai hak akses.</p></div></div>
+            <div class="filters-grid"><label class="field"><span>Mulai</span><input id="exportStart" type="date"></label><label class="field"><span>Selesai</span><input id="exportEnd" type="date"></label><label class="field"><span>Bagian</span><select id="exportBagian" data-section-filter><option value="">Semua</option></select></label></div>
+            <div class="export-card-grid"><article class="export-card"><i data-lucide="sheet"></i><div><h3>Excel</h3><p>Format XLSX untuk laporan.</p></div><button id="exportExcel" class="button button-primary">Download Excel</button></article><article class="export-card"><i data-lucide="file-down"></i><div><h3>CSV</h3><p>Format ringan dan universal.</p></div><button id="exportCsv" class="button button-secondary">Download CSV</button></article></div>
+          </section>
+        </section>
+
+        <section id="locationView" class="admin-view hidden">
+          <form id="locationForm" class="data-section form-stack">
+            <div class="table-meta no-pad"><div><h2>Pengaturan Lokasi Absen</h2><p>Hanya Super Admin yang dapat mengubah titik dan radius.</p></div></div>
+            <label class="field"><span>Nama lokasi</span><input id="officeName" type="text" required></label>
+            <div class="form-row"><label class="field"><span>Latitude</span><input id="officeLatitude" type="number" step="0.00000001" required></label><label class="field"><span>Longitude</span><input id="officeLongitude" type="number" step="0.00000001" required></label><label class="field"><span>Radius meter</span><input id="officeRadius" type="number" min="10" required></label></div>
+            <button class="button button-primary" type="submit"><i data-lucide="save"></i><span>Simpan Lokasi</span></button>
+          </form>
+        </section>
+
+        <section id="adminsView" class="admin-view hidden">
+          <section class="data-section">
+            <div class="table-meta"><div><h2>Manajemen Admin</h2><p>Tambah, edit, nonaktifkan, atau hapus admin.</p></div><button id="addAdminButton" class="button button-primary"><i data-lucide="user-plus"></i><span>Tambah Admin</span></button></div>
+            <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Username</th><th>Role</th><th>Bagian</th><th>Status</th><th class="align-right">Aksi</th></tr></thead><tbody id="adminsBody"></tbody></table><div id="adminsEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada admin</strong></div></div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="employeeModal" class="modal hidden"><div class="modal-backdrop" data-close-employee-modal></div><section class="modal-card form-modal-card"><header class="modal-header"><div><span class="eyebrow">Data Pegawai</span><h2 id="employeeModalTitle">Tambah Pegawai</h2></div><button class="icon-button" data-close-employee-modal><i data-lucide="x"></i></button></header><form id="employeeForm" class="form-stack"><input id="employeeEditId" type="hidden"><label class="field"><span>Nama</span><input id="employeeFormName" required></label><div class="form-row"><label class="field"><span>Bagian</span><select id="employeeFormBagian" required></select></label><label class="field"><span>Shift</span><select id="employeeFormShift" required><option>Pagi</option><option>Siang</option><option>Malam</option><option>Reguler</option></select></label></div><label class="field"><span>Telepon</span><input id="employeeFormPhone"></label><label class="field"><span>PIN <small id="employeePinHint"></small></span><input id="employeeFormPin" type="password"></label><label class="field"><span>Bio</span><textarea id="employeeFormBio" rows="2"></textarea></label><label class="toggle-row"><span><strong>Aktif</strong><small>Pegawai dapat login.</small></span><input id="employeeFormActive" type="checkbox" checked><span class="toggle-control"></span></label><div class="modal-actions horizontal-actions"><button class="button button-secondary" type="button" data-close-employee-modal>Batal</button><button class="button button-primary" type="submit">Simpan</button></div></form></section></div>
+
+  <div id="adminModal" class="modal hidden"><div class="modal-backdrop" data-close-admin-modal></div><section class="modal-card form-modal-card"><header class="modal-header"><div><span class="eyebrow">Akun Admin</span><h2 id="adminModalTitle">Tambah Admin</h2></div><button class="icon-button" data-close-admin-modal><i data-lucide="x"></i></button></header><form id="adminForm" class="form-stack"><input id="adminEditId" type="hidden"><label class="field"><span>Nama</span><input id="adminFormName" required></label><label class="field"><span>Username</span><input id="adminFormUsername" required></label><label class="field"><span>Password/PIN <small id="adminPasswordHint"></small></span><input id="adminFormPassword" type="password" minlength="6"></label><div class="form-row"><label class="field"><span>Role</span><select id="adminFormRole"><option value="super_admin">Super Admin</option><option value="admin_umum">Admin Umum</option><option value="admin_bagian">Admin Bagian</option></select></label><label class="field"><span>Bagian</span><select id="adminFormBagian"></select></label></div><label class="field"><span>Status</span><select id="adminFormStatus"><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></label><div class="modal-actions horizontal-actions"><button class="button button-secondary" type="button" data-close-admin-modal>Batal</button><button class="button button-primary" type="submit">Simpan</button></div></form></section></div>
+
+  <div id="photoModal" class="modal hidden"><div class="modal-backdrop" data-close-photo-modal></div><section class="modal-card photo-modal-card"><header class="modal-header"><h2>Foto Bukti</h2><button class="icon-button" data-close-photo-modal><i data-lucide="x"></i></button></header><img id="photoModalImage" alt="Foto bukti"></section></div>
+  <div id="toastRegion" class="toast-region"></div>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f2a43">
+  <title>Dashboard Pegawai - ABSENSI GKN MAMUJU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="employee-dashboard">
+  <header class="app-header">
+    <a class="brand brand-compact" href="index.html">
+      <span class="brand-mark"><i data-lucide="building-2"></i></span>
+      <span><strong>ABSENSI GKN</strong><small>Dashboard Pegawai</small></span>
+    </a>
+    <button id="employeeLogout" class="button button-quiet" type="button"><i data-lucide="log-out"></i><span>Keluar</span></button>
+  </header>
+
+  <main class="employee-shell">
+    <section class="hero-card">
+      <div class="profile-head">
+        <img id="profilePhoto" class="profile-photo" alt="Foto profil pegawai">
+        <div>
+          <span class="eyebrow">Pegawai GKN Mamuju</span>
+          <h1 id="welcomeName">Halo, Pegawai</h1>
+          <p id="employeeMeta">Bagian - Shift</p>
+        </div>
+      </div>
+      <div class="clock-panel">
+        <span id="liveDate">-</span>
+        <strong id="liveClock">00:00:00</strong>
+        <small>WITA</small>
+      </div>
+    </section>
+
+    <div id="configNotice" class="notice notice-warning hidden"><i data-lucide="triangle-alert"></i><span>Supabase belum dikonfigurasi.</span></div>
+
+    <section class="grid-2">
+      <article class="data-section">
+        <div class="table-meta"><div><span class="eyebrow">Kehadiran Hari Ini</span><h2 id="todayTitle">Status Absensi</h2></div><span id="attendanceBadge" class="status-badge status-neutral">Belum Absen</span></div>
+        <div class="attendance-timeline">
+          <article class="timeline-item" id="checkInTimeline"><span class="timeline-icon"><i data-lucide="log-in"></i></span><div><span>Absen Masuk</span><strong id="checkInValue">Belum tercatat</strong></div></article>
+          <span class="timeline-line"></span>
+          <article class="timeline-item" id="checkOutTimeline"><span class="timeline-icon"><i data-lucide="log-out"></i></span><div><span>Absen Pulang</span><strong id="checkOutValue">Belum tercatat</strong></div></article>
+        </div>
+      </article>
+
+      <article class="data-section">
+        <div class="table-meta"><div><h2>Aturan Jam Kerja</h2><p>Masuk maksimal 07:35, pulang minimal 17:00 WITA.</p></div></div>
+        <div id="officeLocationInfo" class="info-strip"><i data-lucide="map-pin"></i><p>Memuat lokasi absen...</p></div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <form id="checkInForm" class="data-section form-stack">
+        <div class="table-meta no-pad"><div><h2>Absen Masuk</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
+        <label class="field"><span>Foto selfie masuk</span><input id="checkInSelfie" type="file" accept="image/*" capture="user" required></label>
+        <label class="field"><span>Keterangan jika di luar jam/radius</span><textarea id="checkInNote" rows="3" placeholder="Opsional"></textarea></label>
+        <button id="checkInButton" class="button button-primary button-block" type="submit"><i data-lucide="camera"></i><span>Ambil GPS & Absen Masuk</span></button>
+      </form>
+
+      <form id="checkOutForm" class="data-section form-stack">
+        <div class="table-meta no-pad"><div><h2>Absen Pulang</h2><p>Selfie dan GPS wajib diambil.</p></div></div>
+        <label class="field"><span>Foto selfie pulang</span><input id="checkOutSelfie" type="file" accept="image/*" capture="user" required></label>
+        <label class="field"><span>Keterangan pulang cepat / luar radius</span><textarea id="checkOutNote" rows="3" placeholder="Opsional"></textarea></label>
+        <label class="toggle-row"><span><strong>Absen lembur</strong><small>Centang jika pulang sebagai lembur.</small></span><input id="isOvertime" type="checkbox"><span class="toggle-control"></span></label>
+        <label class="field"><span>Catatan lembur</span><input id="overtimeNote" type="text" placeholder="Contoh: pengamanan acara"></label>
+        <button id="checkOutButton" class="button button-dark button-block" type="submit"><i data-lucide="door-open"></i><span>Ambil GPS & Absen Pulang</span></button>
+      </form>
+    </section>
+
+    <section class="grid-2">
+      <form id="requestForm" class="data-section form-stack">
+        <div class="table-meta no-pad"><div><h2>Pengajuan</h2><p>Izin, sakit, cuti, atau lembur.</p></div></div>
+        <div class="form-row">
+          <label class="field"><span>Jenis</span><select id="requestType" required><option value="">Pilih</option><option value="izin">Izin</option><option value="sakit">Sakit</option><option value="cuti">Cuti</option><option value="lembur">Lembur</option></select></label>
+          <label class="field"><span>Mulai</span><input id="requestStart" type="date" required></label>
+          <label class="field"><span>Selesai</span><input id="requestEnd" type="date" required></label>
+        </div>
+        <label class="field"><span>Bukti foto/dokumen</span><input id="requestProof" type="file" accept="image/*,.pdf"></label>
+        <label class="field"><span>Alasan</span><textarea id="requestReason" rows="3" minlength="5" required></textarea></label>
+        <button class="button button-primary" type="submit"><i data-lucide="send"></i><span>Kirim Pengajuan</span></button>
+      </form>
+
+      <form id="profileForm" class="data-section form-stack">
+        <div class="table-meta no-pad"><div><h2>Profil Pegawai</h2><p>Foto profil, bio, dan PIN dapat diperbarui.</p></div></div>
+        <label class="field"><span>Foto profil</span><input id="profilePhotoInput" type="file" accept="image/*"></label>
+        <label class="field"><span>Bio singkat</span><textarea id="employeeBio" rows="3" placeholder="Contoh: Koordinator umum satpam"></textarea></label>
+        <label class="field"><span>PIN baru</span><input id="newEmployeePin" type="password" inputmode="numeric" maxlength="20" placeholder="Kosongkan jika tidak diubah"></label>
+        <button class="button button-secondary" type="submit"><i data-lucide="save"></i><span>Simpan Profil</span></button>
+      </form>
+    </section>
+
+    <section class="data-section">
+      <div class="table-meta"><div><h2>Riwayat Absensi Sendiri</h2><p>Data terbaru pegawai yang sedang login.</p></div><button id="refreshHistory" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Pulang</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="attendanceHistoryBody"></tbody></table><div id="attendanceHistoryEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada riwayat</strong></div></div>
+    </section>
+
+    <section class="data-section">
+      <div class="table-meta"><div><h2>Status Pengajuan</h2><p>Menunggu, Disetujui, atau Ditolak.</p></div><button id="refreshRequests" class="icon-button" type="button"><i data-lucide="refresh-cw"></i></button></div>
+      <div id="requestList" class="request-list"></div>
+      <div id="requestEmpty" class="empty-state hidden"><i data-lucide="inbox"></i><strong>Belum ada pengajuan</strong></div>
+    </section>
+  </main>
+
+  <div id="toastRegion" class="toast-region"></div>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
